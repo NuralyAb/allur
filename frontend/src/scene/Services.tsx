@@ -3,6 +3,7 @@ import { useMemo, useRef } from 'react'
 import { MeshStandardMaterial, type Group } from 'three'
 import { CAR_COLORS, MAT, paint, unitBox, unitCyl, wheelGeo } from './assets'
 import { Car } from './Car'
+import { pickModel } from './carModels'
 import { Instanced } from './Hall'
 import { Label } from './Label'
 import { Worker } from './Worker'
@@ -50,17 +51,27 @@ function Cud() {
     <group>
       {posts.map((u, i) => (
         <group key={u} position={[u, 0, -122]}>
-          <mesh geometry={unitBox} material={liftMat} scale={[0.35, 2.6, 0.35]} position={[0, 1.3, 1.6]} />
-          <mesh geometry={unitBox} material={liftMat} scale={[0.35, 2.6, 0.35]} position={[0, 1.3, -1.6]} />
-          <Car body={paint(CAR_COLORS[(i + 1) % 5])} glass={MAT.glass} wheels position={[0, 1.4, 0]} rotation={[0, Math.PI / 2, 0]} />
-          <Worker position={[1.6, 0, 0]} yaw={Math.PI} phase={i * 2} />
+          {/* двухстоечный подъёмник: стойки по бокам машины, лапы под порогами */}
+          <mesh geometry={unitBox} material={liftMat} scale={[0.35, 2.6, 0.35]} position={[1.35, 1.3, 0]} />
+          <mesh geometry={unitBox} material={liftMat} scale={[0.35, 2.6, 0.35]} position={[-1.35, 1.3, 0]} />
+          <mesh geometry={unitBox} material={MAT.darkSteel} scale={[2.5, 0.08, 1.6]} position={[0, 1.42, 0]} />
+          <Car
+            model={pickModel(i + 1)}
+            body={paint(CAR_COLORS[(i + 1) % 5])}
+            glass={MAT.glass}
+            wheels
+            details
+            position={[0, 1.4, 0]}
+            rotation={[0, Math.PI / 2, 0]}
+          />
+          <Worker position={[0.4, 0, -2.6]} yaw={Math.PI / 2} phase={i * 2} />
         </group>
       ))}
       {/* окрасочно-сушильная камера */}
       <group position={[44, 0, -122]}>
         <mesh geometry={unitBox} material={boothGlass} scale={[8, 4, 6]} position={[0, 2, 0]} />
         <mesh geometry={unitBox} material={MAT.steel} scale={[8.2, 0.3, 6.2]} position={[0, 4.1, 0]} />
-        <Car body={paint(CAR_COLORS[3])} glass={MAT.glass} wheels />
+        <Car model="cobalt" body={paint(CAR_COLORS[3])} glass={MAT.glass} wheels details />
       </group>
       <Label position={[28, 6, -122]} color="#fb923c" small>
         Посты доработки · окрасочная камера

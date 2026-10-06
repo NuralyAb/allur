@@ -5,6 +5,7 @@ import { CAR_COLORS, MAT, paint, unitBox } from './assets'
 import { Instanced } from './Hall'
 import { Label } from './Label'
 import { makePath, mod, placeOnPath, type P3 } from './motion'
+import { pickModel } from './carModels'
 import { ParkedCars, type ParkedCar } from './ParkedCars'
 import { Robot } from './Robot'
 import { Worker } from './Worker'
@@ -222,8 +223,8 @@ function Pbs() {
     for (let u = 304; u <= 352; u += 6)
       for (const v of [18, 28, 38, 48, 58, 68, 78]) {
         // кузова на двух ярусах стеллажа
-        out.push({ p: [u, 0.5, -v], r: Math.PI / 2, color: CAR_COLORS[k++ % 5] })
-        if ((u + v) % 4 === 0) out.push({ p: [u, 3.3, -v], r: Math.PI / 2, color: CAR_COLORS[k++ % 5] })
+        out.push({ p: [u, 0.5, -v], r: Math.PI / 2, color: CAR_COLORS[k % 5], model: pickModel(k++) })
+        if ((u + v) % 4 === 0) out.push({ p: [u, 3.3, -v], r: Math.PI / 2, color: CAR_COLORS[k % 5], model: pickModel(k++) })
       }
     return out
   }, [])
@@ -235,7 +236,7 @@ function Pbs() {
   return (
     <group>
       <Instanced geometry={unitBox} material={MAT.steel} items={shelves} />
-      <ParkedCars cars={cars} wheels={false} glass={false} />
+      <ParkedCars cars={cars} wheels={false} glass={false} details={false} />
     </group>
   )
 }

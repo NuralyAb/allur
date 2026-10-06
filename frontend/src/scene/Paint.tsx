@@ -3,6 +3,7 @@ import { useMemo, useRef } from 'react'
 import { Color, MeshBasicMaterial, MeshStandardMaterial } from 'three'
 import { CAR_COLORS, MAT, paint, unitBox } from './assets'
 import { Car, type CarHandle } from './Car'
+import { pickModel } from './carModels'
 import { Instanced } from './Hall'
 import { Label } from './Label'
 import { makePath, mod, placeOnPath, type P3 } from './motion'
@@ -98,7 +99,7 @@ function Bodies() {
   return (
     <group>
       {Array.from({ length: count }, (_, i) => (
-        <Car key={i} ref={(c) => void (cars.current[i] = c)} />
+        <Car key={i} ref={(c) => void (cars.current[i] = c)} model={pickModel(i)} />
       ))}
     </group>
   )

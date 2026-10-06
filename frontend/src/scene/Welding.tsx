@@ -3,6 +3,7 @@ import { useMemo, useRef } from 'react'
 import { Color, MeshBasicMaterial, MeshStandardMaterial, type Mesh } from 'three'
 import { MAT, unitBox } from './assets'
 import { Car, type CarHandle } from './Car'
+import { pickModel, type CarModelId } from './carModels'
 import { L } from './geo'
 import { Instanced } from './Hall'
 import { Label } from './Label'
@@ -16,11 +17,11 @@ import { Worker } from './Worker'
  * Кузов ≈90 деталей, ≈3 000 точек. Линия Onix — лазерная сварка крыши (Tengrinews, 2023).
  */
 export const WELD_LINES = [
-  { v: 68, model: 'Chevrolet Onix', note: 'лазерная сварка крыши' },
-  { v: 50, model: 'Chevrolet Cobalt', note: '' },
-  { v: 32, model: 'JAC J7', note: '' },
-  { v: 14, model: 'Мультимодельная', note: 'резерв / CKD' },
-]
+  { v: 68, model: 'Chevrolet Onix', note: 'лазерная сварка крыши', car: 'onix' },
+  { v: 50, model: 'Chevrolet Cobalt', note: '', car: 'cobalt' },
+  { v: 32, model: 'JAC J7', note: '', car: 'j7' },
+  { v: 14, model: 'Мультимодельная', note: 'резерв / CKD', car: null },
+] satisfies { v: number; model: string; note: string; car: CarModelId | null }[]
 const U0 = 62 // первый пост
 const PITCH = 10 // шаг постов, м
 const SLOTS = 10 // 9 сварочных постов + рихтовка/геометрия
@@ -32,7 +33,7 @@ const laserCellMat = new MeshStandardMaterial({ color: '#25292f', transparent: t
 const laserWindow = new MeshBasicMaterial({ color: new Color(1.1, 0.12, 0.08), toneMapped: false, transparent: true, opacity: 0.45 })
 const scanMat = new MeshBasicMaterial({ color: new Color(0.2, 3, 0.6), toneMapped: false })
 
-function Line({ index, v, model, note }: { index: number; v: number; model: string; note: string }) {
+function Line({ index, v, model, note, car }: { index: number; v: number; model: string; note: string; car: CarModelId | null }) {
   const offset = index * 2.1
   const cars = useRef<(CarHandle | null)[]>([])
   const laser = index === 0
@@ -81,7 +82,7 @@ function Line({ index, v, model, note }: { index: number; v: number; model: stri
       <Instanced geometry={unitBox} material={fenceMat} items={fence} />
 
       {Array.from({ length: SLOTS }, (_, i) => (
-        <Car key={i} ref={(c) => void (cars.current[i] = c)} />
+        <Car key={i} ref={(c) => void (cars.current[i] = c)} model={car ?? pickModel(i)} />
       ))}
 
       {robots.map((r, i) => (

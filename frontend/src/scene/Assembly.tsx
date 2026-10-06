@@ -4,6 +4,7 @@ import { Suspense, useMemo, useRef } from 'react'
 import { Color, InstancedMesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, type Group, type Mesh } from 'three'
 import { CAR_COLORS, MAT, paint, unitBox, unitCyl } from './assets'
 import { Car, type CarHandle } from './Car'
+import { pickModel } from './carModels'
 import { Instanced } from './Hall'
 import { Label } from './Label'
 import { makePath, mod, placeOnPath, type P3 } from './motion'
@@ -76,6 +77,7 @@ function AssemblyCars() {
       const laneC = Math.abs(p.z + LANES[2]) < 0.5
       c.setGlass(laneB && p.x < UB - 18 ? MAT.glass : laneC ? MAT.glass : MAT.opening)
       c.setWheels(laneC && p.x > UA + 4 * POST)
+      c.setDetails(laneB || laneC)
       const h = hangers.current[i]
       if (h) h.visible = laneB
     })
@@ -85,7 +87,7 @@ function AssemblyCars() {
     <group>
       {Array.from({ length: count }, (_, i) => (
         <group key={i}>
-          <Car ref={(c) => void (cars.current[i] = c)} body={paint(CAR_COLORS[(i * 3) % 5])} />
+          <Car ref={(c) => void (cars.current[i] = c)} model={pickModel(i)} body={paint(CAR_COLORS[(i * 3) % 5])} />
         </group>
       ))}
       {/* подвески подвесного конвейера едут вместе с кузовами ветки B */}
@@ -144,7 +146,15 @@ function QcCars() {
   return (
     <group>
       {Array.from({ length: count }, (_, i) => (
-        <Car key={i} ref={(c) => void (cars.current[i] = c)} body={paint(CAR_COLORS[(i * 2) % 5])} glass={MAT.glass} wheels />
+        <Car
+          key={i}
+          ref={(c) => void (cars.current[i] = c)}
+          model={pickModel(i + 3)}
+          body={paint(CAR_COLORS[(i * 2) % 5])}
+          glass={MAT.glass}
+          wheels
+          details
+        />
       ))}
     </group>
   )

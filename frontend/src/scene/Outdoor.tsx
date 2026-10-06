@@ -8,6 +8,7 @@ import { Car, type CarHandle } from './Car'
 import { hallToWorld, world } from './geo'
 import { Instanced } from './Hall'
 import { makePath, mod, placeOnPath, type P3 } from './motion'
+import { pickModel } from './carModels'
 import { ParkedCars, type ParkedCar } from './ParkedCars'
 
 type Item = { p: [number, number, number]; s: [number, number, number]; r?: number }
@@ -83,7 +84,7 @@ function FinishedLot({ zone }: { zone: OutdoorZone }) {
           const c = rnd(k++)
           // основной поток — белые и серебристые машины, как на спутниковом снимке
           const color = c < 0.45 ? CAR_COLORS[0] : c < 0.7 ? CAR_COLORS[2] : c < 0.85 ? CAR_COLORS[1] : CAR_COLORS[3 + (k % 2)]
-          out.push({ p: [x, 0, z + side], r: Math.PI / 2, color })
+          out.push({ p: [x, 0, z + side], r: Math.PI / 2, color, model: pickModel(k) })
         }
       }
     }
@@ -123,7 +124,7 @@ function TestTrack({ zone }: { zone: OutdoorZone }) {
   return (
     <group>
       <Line points={marks} color="#f4f4f4" lineWidth={2} />
-      <Car ref={car} body={paint(CAR_COLORS[3])} glass={MAT.glass} wheels />
+      <Car ref={car} model="onix" body={paint(CAR_COLORS[3])} glass={MAT.glass} wheels details />
       <Instanced geometry={unitBox} material={coneMat} items={cones} />
     </group>
   )
@@ -155,7 +156,15 @@ function Outbound({ frame }: { frame: HallFrame }) {
   return (
     <group>
       {Array.from({ length: Math.floor(len / 38) }, (_, i) => (
-        <Car key={i} ref={(c) => void (refs.current[i] = c)} body={paint(CAR_COLORS[i % 5])} glass={MAT.glass} wheels />
+        <Car
+          key={i}
+          ref={(c) => void (refs.current[i] = c)}
+          model={pickModel(i)}
+          body={paint(CAR_COLORS[i % 5])}
+          glass={MAT.glass}
+          wheels
+          details
+        />
       ))}
     </group>
   )

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { loadAll } from './api'
 import { Scene, outdoorShot, zoneShot, type Shot } from './scene/Scene'
+import { hallToWorld } from './scene/geo'
 import { buildTour } from './scene/tour'
 import type { Kpi, OutdoorZone, Plant, Selection, Site, Zone } from './types'
 import { TopBar } from './ui/TopBar'
@@ -67,11 +68,18 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
     [tour, findSelection],
   )
 
-  // прямая ссылка на шаг экскурсии: ?step=5
+  // прямая ссылка на шаг экскурсии: ?step=5; произвольный ракурс в координатах корпуса:
+  // ?cam=u,v,h,u2,v2,h2 (камера → цель), &roof=1 — с кровлей
   useEffect(() => {
-    const n = Number(new URLSearchParams(window.location.search).get('step'))
+    const q = new URLSearchParams(window.location.search)
+    const n = Number(q.get('step'))
     if (n >= 1 && n <= tour.length) goTo(n - 1)
-  }, [tour, goTo])
+    const cam = q.get('cam')?.split(',').map(Number)
+    if (cam?.length === 6 && cam.every(Number.isFinite)) {
+      setRoof(q.get('roof') === '1')
+      setShot({ camera: hallToWorld(plant.hall, cam[0], cam[1], cam[2]), target: hallToWorld(plant.hall, cam[3], cam[4], cam[5]) })
+    }
+  }, [tour, goTo, plant])
 
   // автопереход шагов экскурсии
   useEffect(() => {
