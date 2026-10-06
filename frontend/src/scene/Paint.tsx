@@ -1,0 +1,236 @@
+import { useFrame } from '@react-three/fiber'
+import { useMemo, useRef } from 'react'
+import { Color, MeshBasicMaterial, MeshStandardMaterial } from 'three'
+import { CAR_COLORS, MAT, paint, unitBox } from './assets'
+import { Car, type CarHandle } from './Car'
+import { Instanced } from './Hall'
+import { Label } from './Label'
+import { makePath, mod, placeOnPath, type P3 } from './motion'
+import { Robot } from './Robot'
+import { Worker } from './Worker'
+
+/*
+ * Цех окраски кузовов. Проход 1 — подготовка поверхности в 13 ваннах окунанием,
+ * 10-я ванна — катодное электроосаждение грунта (nur.kz). Проход 2 — печь
+ * катафореза и герметизация швов. Проход 3 — кабины грунта, базы и лака (роботы).
+ * Проход 4 — печь финишной сушки, выход в буфер окрашенных кузовов.
+ */
+
+const TANK_C0 = 171.5
+const TANK_PITCH = 7
+const TANKS = Array.from({ length: 13 }, (_, k) => TANK_C0 + k * TANK_PITCH)
+const KTL = 9 // индекс 10-й ванны
+const LIQUID = ['#cfd9c9', '#cfd9c9', '#9fc5e3', '#9fc5e3', '#b9d3cf', '#c9d6b6', '#9fc5e3', '#b5c9d9', '#a8d1ec', '#2b2f35', '#9db3c7', '#9db3c7', '#a8d1ec']
+
+const V1 = 212
+const V2 = 180
+const V3 = 145
+const V4 = 118
+const SPACING = 7.5
+const SPEED = 0.9 // м/с
+
+const PATH: P3[] = [
+  [160, 2.6, -V1],
+  [264, 2.6, -V1],
+  [264, 0.55, -V2],
+  [166, 0.55, -V2],
+  [166, 0.55, -V3],
+  [262, 0.55, -V3],
+  [262, 0.55, -V4],
+  [166, 0.55, -V4],
+  [166, 0.55, -104],
+]
+
+// участки прохода 3 (u)
+const PRIMER = [172, 190] as const
+const BASE = [198, 226] as const
+const CLEAR = [232, 252] as const
+
+const liquidMats = LIQUID.map((c, i) =>
+  i === KTL ? paint(c, 0.3, 0.25) : new MeshStandardMaterial({ color: c, roughness: 0.15, metalness: 0.1 }),
+)
+const boothGlass = new MeshStandardMaterial({ color: '#cfe3f1', transparent: true, opacity: 0.22, roughness: 0.05, depthWrite: false })
+const boothLight = new MeshBasicMaterial({ color: new Color(1.15, 1.15, 1.1), toneMapped: false })
+const ovenGlow = new MeshBasicMaterial({ color: new Color(3, 1.1, 0.25), toneMapped: false })
+const ovenSkin = paint('#c3c8cd', 0.85, 0.3)
+
+function dip(u: number) {
+  let y = 0
+  for (const c of TANKS) {
+    const d = Math.abs(u - c)
+    if (d < 2.8) y = Math.min(y, -3.4 * (Math.cos((d / 2.8) * Math.PI) + 1) * 0.5)
+  }
+  return y
+}
+
+function Bodies() {
+  const path = useMemo(() => makePath(PATH, 3.5), [])
+  const length = useMemo(() => path.getLength(), [path])
+  const count = Math.floor(length / SPACING)
+  const cars = useRef<(CarHandle | null)[]>([])
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    cars.current.forEach((c, i) => {
+      if (!c) return
+      const dist = mod(t * SPEED + i * SPACING, count * SPACING)
+      const p = placeOnPath(path, length, dist, c.root)
+      const pass1 = Math.abs(p.z + V1) < 0.5 && p.y > 2
+      const pass3 = Math.abs(p.z + V3) < 0.5
+      const u = p.x
+      if (pass1) {
+        const y = dip(u)
+        c.root.position.y += y
+        c.root.rotation.z = (dip(u + 0.4) - dip(u - 0.4)) * 0.6
+        c.setBody(u > TANKS[KTL] ? MAT.ed : MAT.biw)
+      } else if (pass3) {
+        c.setBody(u < PRIMER[1] - 4 ? MAT.ed : u < BASE[0] + 12 ? MAT.primer : paint(CAR_COLORS[i % 5]))
+      } else if (Math.abs(p.z + V2) < 0.5) {
+        c.setBody(MAT.ed)
+      } else if (Math.abs(p.z + V4) < 0.5 || p.z > -110) {
+        c.setBody(paint(CAR_COLORS[i % 5]))
+      }
+    })
+  })
+
+  return (
+    <group>
+      {Array.from({ length: count }, (_, i) => (
+        <Car key={i} ref={(c) => void (cars.current[i] = c)} />
+      ))}
+    </group>
+  )
+}
+
+function Tanks() {
+  return (
+    <group>
+      {TANKS.map((c, k) => (
+        <group key={k} position={[c, 0, -V1]}>
+          {/* борта ванны */}
+          <mesh geometry={unitBox} material={MAT.concrete} scale={[6.2, 1.3, 0.3]} position={[0, 0.65, 1.9]} />
+          <mesh geometry={unitBox} material={MAT.concrete} scale={[6.2, 1.3, 0.3]} position={[0, 0.65, -1.9]} />
+          <mesh geometry={unitBox} material={MAT.concrete} scale={[0.3, 1.3, 4.1]} position={[3.1, 0.65, 0]} />
+          <mesh geometry={unitBox} material={MAT.concrete} scale={[0.3, 1.3, 4.1]} position={[-3.1, 0.65, 0]} />
+          <mesh geometry={unitBox} material={liquidMats[k]} scale={[5.9, 0.05, 3.5]} position={[0, 1.05, 0]} />
+          {k === KTL && (
+            <>
+              <mesh geometry={unitBox} material={MAT.yellow} scale={[6.4, 0.12, 0.12]} position={[0, 1.35, 2.05]} />
+              <Label position={[0, 3.2, 3.5]} color="#22c3a6" small>
+                Ванна №10 · катафорез
+              </Label>
+            </>
+          )}
+        </group>
+      ))}
+      <Label position={[TANKS[0] - 1, 3.4, -(V1 + 4)]} color="#22c3a6" small>
+        Подготовка поверхности · 13 ванн
+      </Label>
+      {/* монорельс окунания */}
+      <mesh geometry={unitBox} material={MAT.darkSteel} scale={[106, 0.4, 0.3]} position={[212, 5.6, -V1]} />
+      {[165, 190, 215, 240, 262].map((u) => (
+        <group key={u}>
+          <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.3, 5.6, 0.3]} position={[u, 2.8, -(V1 + 2.4)]} />
+          <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.3, 5.6, 0.3]} position={[u, 2.8, -(V1 - 2.4)]} />
+          <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.3, 0.3, 5]} position={[u, 5.6, -V1]} />
+        </group>
+      ))}
+    </group>
+  )
+}
+
+function Oven({ u0, u1, v, label }: { u0: number; u1: number; v: number; label: string }) {
+  const len = u1 - u0
+  const c = (u0 + u1) / 2
+  return (
+    <group position={[c, 0, -v]}>
+      <mesh geometry={unitBox} material={ovenSkin} scale={[len, 3.4, 0.3]} position={[0, 1.7, 2.3]} />
+      <mesh geometry={unitBox} material={ovenSkin} scale={[len, 3.4, 0.3]} position={[0, 1.7, -2.3]} />
+      <mesh geometry={unitBox} material={ovenSkin} scale={[len, 0.3, 4.9]} position={[0, 3.4, 0]} />
+      <mesh geometry={unitBox} material={ovenGlow} scale={[len - 1, 0.1, 0.1]} position={[0, 3.6, 2.2]} />
+      <mesh geometry={unitBox} material={ovenGlow} scale={[len - 1, 0.1, 0.1]} position={[0, 3.6, -2.2]} />
+      {/* вытяжные трубы */}
+      {[-len / 3, 0, len / 3].map((x) => (
+        <mesh key={x} geometry={unitBox} material={ovenSkin} scale={[0.9, 6, 0.9]} position={[x, 6.4, 0]} />
+      ))}
+      <Label position={[0, 5, 0]} color="#ff9b3d" small>
+        {label}
+      </Label>
+    </group>
+  )
+}
+
+function Booth({ u0, u1, label, robotsPerSide }: { u0: number; u1: number; label: string; robotsPerSide: number }) {
+  const len = u1 - u0
+  const c = (u0 + u1) / 2
+  const step = len / robotsPerSide
+  return (
+    <group position={[c, 0, -V3]}>
+      <mesh geometry={unitBox} material={boothGlass} scale={[len, 4.6, 0.08]} position={[0, 2.3, 4.2]} />
+      <mesh geometry={unitBox} material={boothGlass} scale={[len, 4.6, 0.08]} position={[0, 2.3, -4.2]} />
+      {/* потолок кабины — фильтры приточной вентиляции, прозрачный для обзора */}
+      <mesh geometry={unitBox} material={boothGlass} scale={[len, 0.1, 8.6]} position={[0, 4.7, 0]} />
+      <mesh geometry={unitBox} material={MAT.steel} scale={[len, 0.25, 0.25]} position={[0, 4.7, 4.2]} />
+      <mesh geometry={unitBox} material={MAT.steel} scale={[len, 0.25, 0.25]} position={[0, 4.7, -4.2]} />
+      <mesh geometry={unitBox} material={boothLight} scale={[len - 1, 0.06, 0.25]} position={[0, 4.55, 2.4]} />
+      <mesh geometry={unitBox} material={boothLight} scale={[len - 1, 0.06, 0.25]} position={[0, 4.55, -2.4]} />
+      {/* решётчатый пол кабины */}
+      <mesh geometry={unitBox} material={MAT.darkSteel} scale={[len, 0.1, 8.3]} position={[0, 0.06, 0]} />
+      {Array.from({ length: robotsPerSide }, (_, i) =>
+        ([1, -1] as const).map((side) => (
+          <Robot
+            key={`${i}${side}`}
+            position={[-len / 2 + step * (i + 0.5), 0.6, side * 3]}
+            yaw={side === 1 ? Math.PI / 2 : -Math.PI / 2}
+            tool="spray"
+            material={MAT.wall}
+            phase={i * 1.3 + side}
+            speed={0.9}
+            scale={0.85}
+          />
+        )),
+      )}
+      <Label position={[0, 6.2, 0]} color="#22c3a6" small>
+        {label}
+      </Label>
+    </group>
+  )
+}
+
+/** Перегородки цеха окраски — отдельная «чистая» зона. */
+function Enclosure() {
+  const items = useMemo(
+    () => [
+      { p: [214, 3, -100] as [number, number, number], s: [108, 6, 0.12] as [number, number, number] },
+      { p: [160, 3, -163.5] as [number, number, number], s: [0.12, 6, 127] as [number, number, number] },
+      { p: [268, 3, -163.5] as [number, number, number], s: [0.12, 6, 127] as [number, number, number] },
+    ],
+    [],
+  )
+  return <Instanced geometry={unitBox} material={boothGlass} items={items} />
+}
+
+export function Paint() {
+  return (
+    <group>
+      <Enclosure />
+      <Tanks />
+      <Oven u0={205} u1={258} v={V2} label="Печь сушки катафореза" />
+      <Oven u0={176} u1={254} v={V4} label="Печь финишной сушки" />
+      {/* герметизация швов */}
+      {[174, 184, 194].map((u, i) => (
+        <group key={u}>
+          <Worker position={[u, 0, -(V2 + 2.6)]} yaw={Math.PI / 2} phase={i} />
+          <Worker position={[u + 3, 0, -(V2 - 2.6)]} yaw={-Math.PI / 2} phase={i + 2} />
+        </group>
+      ))}
+      <Label position={[184, 4, -V2]} color="#22c3a6" small>
+        Герметизация швов
+      </Label>
+      <Booth u0={PRIMER[0]} u1={PRIMER[1]} label="Кабина грунта" robotsPerSide={2} />
+      <Booth u0={BASE[0]} u1={BASE[1]} label="Кабина базовой эмали" robotsPerSide={3} />
+      <Booth u0={CLEAR[0]} u1={CLEAR[1]} label="Кабина лака" robotsPerSide={2} />
+      <Bodies />
+    </group>
+  )
+}

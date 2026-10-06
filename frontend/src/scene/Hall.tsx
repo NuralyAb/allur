@@ -1,0 +1,132 @@
+import { useLayoutEffect, useMemo, useRef } from 'react'
+import {
+  ExtrudeGeometry,
+  InstancedMesh,
+  MeshStandardMaterial,
+  Object3D,
+  Shape,
+  ShapeGeometry,
+  type BufferGeometry,
+  type Material,
+} from 'three'
+import type { HallFrame, XY } from '../types'
+import { MAT, unitBox } from './assets'
+
+const glassWall = new MeshStandardMaterial({ color: '#9fb6c8', metalness: 0.2, roughness: 0.1, transparent: true, opacity: 0.35 })
+const skylight = new MeshStandardMaterial({ color: '#9ea7af', roughness: 0.4, metalness: 0.2 })
+const epoxy = new MeshStandardMaterial({ color: '#8d959c', roughness: 0.55, metalness: 0.05 })
+
+/** Сетка колонн: шаг 24 м вдоль корпуса, ряды между технологическими линиями. */
+export const COLUMN_U = Array.from({ length: 14 }, (_, i) => 24 + i * 24)
+export const COLUMN_V = [54, 98, 140, 184]
+
+function shapeUV(poly: XY[]) {
+  const s = new Shape()
+  s.moveTo(poly[0][0], poly[0][1])
+  for (const p of poly.slice(1)) s.lineTo(p[0], p[1])
+  s.closePath()
+  return s
+}
+
+/** Набор одинаковых объектов одним draw call. */
+export function Instanced({
+  geometry,
+  material,
+  items,
+  castShadow,
+}: {
+  geometry: BufferGeometry
+  material: Material
+  items: { p: [number, number, number]; s?: [number, number, number]; r?: number }[]
+  castShadow?: boolean
+}) {
+  const ref = useRef<InstancedMesh>(null!)
+  useLayoutEffect(() => {
+    const o = new Object3D()
+    items.forEach((it, i) => {
+      o.position.set(...it.p)
+      o.rotation.set(0, it.r ?? 0, 0)
+      o.scale.set(...(it.s ?? [1, 1, 1]))
+      o.updateMatrix()
+      ref.current.setMatrixAt(i, o.matrix)
+    })
+    ref.current.instanceMatrix.needsUpdate = true
+    ref.current.computeBoundingSphere()
+  }, [items])
+  return <instancedMesh ref={ref} args={[geometry, material, items.length]} castShadow={castShadow} receiveShadow />
+}
+
+interface Props {
+  frame: HallFrame
+  /** контур корпуса в координатах (u, v) */
+  outline: XY[]
+  roof: boolean
+}
+
+/** Оболочка главного корпуса: пол, стены по реальному контуру, колонны, фермы, светильники, кровля. */
+export function Hall({ frame, outline, roof }: Props) {
+  const H = frame.height
+  const { floorGeo, roofGeo, walls } = useMemo(() => {
+    const shape = shapeUV(outline)
+    const floorGeo = new ShapeGeometry(shape).rotateX(-Math.PI / 2)
+    const roofGeo = new ExtrudeGeometry(shape, { depth: 0.6, bevelEnabled: false }).rotateX(-Math.PI / 2)
+    const walls = outline.map((a, i) => {
+      const b = outline[(i + 1) % outline.length]
+      const du = b[0] - a[0]
+      const dv = b[1] - a[1]
+      return {
+        len: Math.hypot(du, dv),
+        mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] as XY,
+        rot: Math.atan2(dv, du),
+      }
+    })
+    return { floorGeo, roofGeo, walls }
+  }, [outline])
+
+  const wallH = roof ? H : 3.2
+
+  const columns = useMemo(
+    () =>
+      COLUMN_U.flatMap((u) =>
+        COLUMN_V.map((v) => ({ p: [u, H / 2, -v] as [number, number, number], s: [0.45, H, 0.45] as [number, number, number] })),
+      ),
+    [H],
+  )
+  return (
+    <group>
+      <mesh geometry={floorGeo} material={epoxy} position={[0, 0.03, 0]} receiveShadow />
+
+      {walls.map((w, i) => (
+        <group key={i} position={[w.mid[0], 0, -w.mid[1]]} rotation={[0, w.rot, 0]}>
+          {/* цоколь */}
+          <mesh geometry={unitBox} material={MAT.concrete} scale={[w.len, 1.2, 0.5]} position={[0, 0.6, 0]} receiveShadow />
+          {/* сэндвич-панели */}
+          <mesh geometry={unitBox} material={MAT.wall} scale={[w.len, wallH - 1.2, 0.4]} position={[0, 1.2 + (wallH - 1.2) / 2, 0]} castShadow receiveShadow />
+          {roof && (
+            <mesh geometry={unitBox} material={glassWall} scale={[w.len * 0.96, 1.4, 0.45]} position={[0, H - 2.2, 0]} />
+          )}
+        </group>
+      ))}
+
+      <Instanced geometry={unitBox} material={MAT.darkSteel} items={columns} castShadow />
+
+      {roof && (
+        <group>
+          <mesh geometry={roofGeo} material={MAT.roof} position={[0, H, 0]} castShadow receiveShadow />
+          <Skylights frame={frame} />
+        </group>
+      )}
+    </group>
+  )
+}
+
+/** Зенитные фонари — светлые прямоугольники на кровле, как на спутниковом снимке. */
+function Skylights({ frame }: { frame: HallFrame }) {
+  const items = useMemo(() => {
+    const out: { p: [number, number, number]; s: [number, number, number] }[] = []
+    for (let u = 70; u < frame.length - 15; u += 9)
+      for (let v = 20; v < frame.width - 15; v += 14) out.push({ p: [u, frame.height + 0.75, -v], s: [3, 0.3, 1.6] })
+    return out
+  }, [frame])
+  return <Instanced geometry={unitBox} material={skylight} items={items} />
+}
