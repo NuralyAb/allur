@@ -128,7 +128,7 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
         onLabels={() => setLabels((l) => !l)}
       />
       <footer className="attrib">
-        Контуры зданий © OpenStreetMap contributors · Спутник: Esri World Imagery · Планировка цехов — реконструкция по открытым источникам
+        Контуры зданий © OpenStreetMap contributors · Спутник: Esri World Imagery · Расстановка цехов — по карте-схеме проекта НДВ ТОО «СарыаркаАвтоПром» (2022)
       </footer>
     </div>
   )

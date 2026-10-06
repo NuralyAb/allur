@@ -11,6 +11,7 @@ import { Hall } from './Hall'
 import { Logistics } from './Logistics'
 import { Outdoor } from './Outdoor'
 import { Paint } from './Paint'
+import { BoilerAnnex, Services } from './Services'
 import { Welding } from './Welding'
 import { Perf } from './Perf'
 import { HallZones, OutdoorZones } from './Zones'
@@ -113,12 +114,14 @@ export function Scene({ plant, site, roof, labels, selection, shot, onSelectZone
       <group position={origin} rotation={[0, frame.angle, 0]}>
         <Hall frame={frame} outline={outline} roof={roof} />
         <HallZones zones={plant.zones} selection={selection} onSelect={onSelectZone} labels={labels} />
+        <BoilerAnnex />
         {!roof && (
           <>
             <Welding />
             <Paint />
             <Assembly />
             <Logistics />
+            <Services />
           </>
         )}
       </group>

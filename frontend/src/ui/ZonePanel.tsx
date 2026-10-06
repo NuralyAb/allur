@@ -14,6 +14,11 @@ export function ZonePanel({ plant, kpi, selection, onClose }: { plant: Plant; kp
       </button>
       <div className="zp-kind">{selection.kind === 'zone' ? 'Главный корпус' : 'Открытая площадка'}</div>
       <h2>{z.name}</h2>
+      {selection.kind === 'zone' && (
+        <div className={`basis basis-${selection.zone.basis}`}>
+          {selection.zone.basis === 'ndv' ? 'Положение по карте-схеме проекта НДВ' : 'Положение — по технологической логике'}
+        </div>
+      )}
       <p className="zp-desc">{z.description}</p>
 
       {area && <AreaKpi rows={area} kpi={kpi} />}

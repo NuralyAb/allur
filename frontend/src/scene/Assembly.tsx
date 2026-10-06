@@ -11,40 +11,44 @@ import { Robot } from './Robot'
 import { Worker } from './Worker'
 
 /*
- * Главный сборочный конвейер — 59 рабочих постов (nur.kz), уложен змейкой в три ветки:
- *  A (v=18)  — монтаж салона, проводки, панели приборов; кузов на напольном слэт-конвейере;
- *  B (v=46)  — подвесной конвейер: топливная и тормозная магистрали снизу, вклейка стёкол;
- *  C (v=74)  — «свадьба» кузова с силовым агрегатом, колёса, заправка жидкостями.
- * Далее ОТК: сход-развал, фары, роликовый тормозной стенд, дождевальная камера, световой туннель.
+ * Главный сборочный конвейер — 59 рабочих постов (nur.kz) в центре корпуса. Конец линий —
+ * ТРК заправки (источники НДВ 0043–0046, u≈195–215). Змейка из трёх веток:
+ *  A (v=146) — монтаж салона, проводки, панели приборов; ветка у склада комплектующих;
+ *  B (v=122) — подвесной конвейер: топливная и тормозная магистрали снизу, вклейка стёкол;
+ *  C (v=98)  — «свадьба» кузова с силовым агрегатом, колёса, заправка жидкостями, ТРК.
+ * Далее ОТК (u 160–245, v 5–80): сход-развал, фары, тормозной стенд, дождевальная камера,
+ * световой туннель; выезд через ворота в юго-западной стене.
  */
 
-const LANES = [18, 46, 74]
-const UA = 232
-const UB = 348
-const POST = (UB - UA) / 20 // 5.8 м
+const LANES = [146, 122, 98]
+const UA = 72
+const UB = 200
+const POST = (UB - UA) / 20 // 6.4 м
 const SPEED = 0.42
 
 const ASM_PATH: P3[] = [
   [UA - 4, 0.35, -LANES[0]],
   [UB, 0.35, -LANES[0]],
-  [UB + 3, 1.0, -(LANES[0] + 14)],
+  [UB + 3, 1.0, -(LANES[0] + LANES[1]) / 2],
   [UB, 1.7, -LANES[1]],
   [UA, 1.7, -LANES[1]],
-  [UA - 3, 1.0, -(LANES[1] + 14)],
+  [UA - 3, 1.0, -(LANES[1] + LANES[2]) / 2],
   [UA, 0.35, -LANES[2]],
   [UB + 2, 0.35, -LANES[2]],
 ]
 
 const QC_PATH: P3[] = [
-  [UB + 4, 0, -LANES[2]],
-  [352, 0, -112],
-  [282, 0, -112],
-  [282, 0, -160],
-  [345, 0, -160],
-  [345, 0, -200],
-  [282, 0, -200],
-  [282, 0, -218],
-  [368, 0, -218],
+  [UB + 3, 0, -LANES[2]],
+  [206, 0, -86],
+  [206, 0, -72],
+  [242, 0, -72],
+  [242, 0, -48],
+  [172, 0, -48],
+  [172, 0, -24],
+  [240, 0, -24],
+  [240, 0, -10],
+  [158, 0, -10],
+  [157, 0, 10],
 ]
 
 const postLine = new MeshBasicMaterial({ color: '#f2c200' })
@@ -70,7 +74,7 @@ function AssemblyCars() {
       const p = placeOnPath(path, length, dist, c.root)
       const laneB = p.y > 1.2
       const laneC = Math.abs(p.z + LANES[2]) < 0.5
-      c.setGlass(laneB && p.x < 330 ? MAT.glass : laneC ? MAT.glass : MAT.opening)
+      c.setGlass(laneB && p.x < UB - 18 ? MAT.glass : laneC ? MAT.glass : MAT.opening)
       c.setWheels(laneC && p.x > UA + 4 * POST)
       const h = hangers.current[i]
       if (h) h.visible = laneB
@@ -181,7 +185,7 @@ function QcStations() {
   return (
     <group>
       {/* сход-развал */}
-      <group position={[330, 0, -112]}>
+      <group position={[214, 0, -72]}>
         <mesh geometry={unitBox} material={MAT.yellow} scale={[5, 0.25, 3.6]} position={[0, 0.12, 0]} />
         {[-1.4, 1.4].flatMap((x) =>
           [-2.2, 2.2].map((z) => <mesh key={`${x}${z}`} geometry={unitBox} material={MAT.darkSteel} scale={[0.25, 1.2, 0.25]} position={[x, 0.6, z]} />),
@@ -191,7 +195,7 @@ function QcStations() {
         </Label>
       </group>
       {/* регулировка фар */}
-      <group position={[308, 0, -112]}>
+      <group position={[224, 0, -72]}>
         <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.4, 1.6, 0.4]} position={[-4, 0.8, 2.4]} />
         <mesh geometry={unitBox} material={MAT.wall} scale={[0.6, 0.5, 0.7]} position={[-4, 1.1, 2.4]} />
         <Label position={[0, 3.5, 0]} color="#f472b6" small>
@@ -199,7 +203,7 @@ function QcStations() {
         </Label>
       </group>
       {/* роликовый тормозной стенд */}
-      <group position={[290, 0, -112]}>
+      <group position={[234, 0, -72]}>
         <mesh geometry={unitBox} material={MAT.darkSteel} scale={[4.6, 0.1, 2.6]} position={[0, 0.03, 0]} />
         <Rollers />
         <mesh geometry={unitBox} material={MAT.wall} scale={[0.8, 1.8, 0.6]} position={[0, 0.9, 3]} />
@@ -208,7 +212,7 @@ function QcStations() {
         </Label>
       </group>
       {/* дождевальная камера */}
-      <group position={[313, 0, -160]}>
+      <group position={[207, 0, -48]}>
         <mesh geometry={unitBox} material={waterGlass} scale={[26, 4.5, 0.1]} position={[0, 2.25, 4]} />
         <mesh geometry={unitBox} material={waterGlass} scale={[26, 4.5, 0.1]} position={[0, 2.25, -4]} />
         <mesh geometry={unitBox} material={MAT.steel} scale={[26, 0.2, 8.2]} position={[0, 4.5, 0]} />
@@ -218,7 +222,7 @@ function QcStations() {
         </Label>
       </group>
       {/* световой туннель финальной инспекции */}
-      <group position={[310, 0, -200]}>
+      <group position={[206, 0, -24]}>
         {Array.from({ length: 14 }, (_, i) => (
           <group key={i} position={[-13 + i * 2, 0, 0]}>
             <mesh geometry={unitBox} material={tunnelLight} scale={[0.15, 3.6, 0.1]} position={[0, 1.8, 3]} />
@@ -232,8 +236,8 @@ function QcStations() {
           Световой туннель · финальная инспекция
         </Label>
       </group>
-      {/* ворота отгрузки в торцевой стене */}
-      <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.7, 4.5, 5]} position={[360.6, 2.25, -218]} />
+      {/* ворота выезда в юго-западной стене */}
+      <mesh geometry={unitBox} material={MAT.darkSteel} scale={[5, 4.5, 0.7]} position={[157, 2.25, 0.2]} />
     </group>
   )
 }
@@ -302,6 +306,14 @@ function LineFurniture() {
       <Robot position={[UB - 8, 0, -(LANES[1] - 4)]} yaw={Math.PI / 2} tool="gripper" speed={0.8} />
       {/* «свадьба»: подъёмник с силовым агрегатом под кузовом */}
       <Marriage />
+      {/* ТРК в конце линии — источники 0043–0046 проекта НДВ */}
+      <group position={[UB - 3, 0, -(LANES[2] - 3.8)]}>
+        <mesh geometry={unitBox} material={MAT.wall} scale={[1.2, 1.9, 0.7]} position={[0, 0.95, 0]} />
+        <mesh geometry={unitBox} material={paint('#d62828', 0.2, 0.5)} scale={[1.25, 0.35, 0.75]} position={[0, 1.75, 0]} />
+        <Label position={[0, 3.2, 0]} color="#facc15" small>
+          ТРК · заправка топливом
+        </Label>
+      </group>
       {/* заправка жидкостями — стойки с рукавами */}
       {[0, 1, 2].map((i) => (
         <group key={i} position={[UB - 10 - i * POST, 0, -(LANES[2] + 3.6)]}>

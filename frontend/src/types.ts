@@ -21,6 +21,8 @@ export interface Zone {
   rect: [number, number, number, number] // u0, u1, v0, v1
   color: string
   kpiArea: string | null
+  /** ndv — положение подтверждено проектом НДВ; logic — размещено по технологической логике */
+  basis: 'ndv' | 'logic'
   description: string
   facts: Fact[]
 }

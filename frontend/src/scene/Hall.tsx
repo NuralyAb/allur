@@ -18,7 +18,10 @@ const epoxy = new MeshStandardMaterial({ color: '#8d959c', roughness: 0.55, meta
 
 /** Сетка колонн: шаг 24 м вдоль корпуса, ряды между технологическими линиями. */
 export const COLUMN_U = Array.from({ length: 14 }, (_, i) => 24 + i * 24)
-export const COLUMN_V = [54, 98, 140, 184]
+export const COLUMN_V = [86, 110, 134, 170]
+/** Участки без колонн (u0, u1, v0, v1): конвейеры окраски кузовов и пластика. */
+const COLUMN_CLEAR = [[218, 334, 88, 204]]
+const clear = (u: number, v: number) => COLUMN_CLEAR.some(([u0, u1, v0, v1]) => u > u0 && u < u1 && v > v0 && v < v1)
 
 function shapeUV(poly: XY[]) {
   const s = new Shape()
@@ -88,7 +91,10 @@ export function Hall({ frame, outline, roof }: Props) {
   const columns = useMemo(
     () =>
       COLUMN_U.flatMap((u) =>
-        COLUMN_V.map((v) => ({ p: [u, H / 2, -v] as [number, number, number], s: [0.45, H, 0.45] as [number, number, number] })),
+        COLUMN_V.filter((v) => !clear(u, v)).map((v) => ({
+          p: [u, H / 2, -v] as [number, number, number],
+          s: [0.45, H, 0.45] as [number, number, number],
+        })),
       ),
     [H],
   )

@@ -11,16 +11,17 @@ import { Robot } from './Robot'
 import { Worker } from './Worker'
 
 /**
- * Цех сварки: 4 линии, по одной на модель (nur.kz). Кузов ≈90 деталей, ≈3 000 точек.
- * Линия Onix — лазерная сварка крыши восемью роботами (Tengrinews, 2023).
+ * Цех сварки (ЦСК): у юго-западной стены, северо-западная половина корпуса — по
+ * источникам 0001–0007 проекта НДВ. 4 линии, по одной на модель (nur.kz).
+ * Кузов ≈90 деталей, ≈3 000 точек. Линия Onix — лазерная сварка крыши (Tengrinews, 2023).
  */
 export const WELD_LINES = [
-  { v: 200, model: 'Chevrolet Onix', note: 'лазерная сварка крыши' },
-  { v: 160, model: 'Chevrolet Cobalt', note: '' },
-  { v: 120, model: 'JAC J7', note: '' },
-  { v: 80, model: 'Мультимодельная', note: 'резерв / CKD' },
+  { v: 68, model: 'Chevrolet Onix', note: 'лазерная сварка крыши' },
+  { v: 50, model: 'Chevrolet Cobalt', note: '' },
+  { v: 32, model: 'JAC J7', note: '' },
+  { v: 14, model: 'Мультимодельная', note: 'резерв / CKD' },
 ]
-const U0 = 54 // первый пост
+const U0 = 62 // первый пост
 const PITCH = 10 // шаг постов, м
 const SLOTS = 10 // 9 сварочных постов + рихтовка/геометрия
 const PERIOD = 9 // такт демонстрации, с

@@ -1,7 +1,7 @@
 import type { OutdoorZone, Plant, Selection, Zone } from '../types'
 
 /** Порядок по технологическому потоку. */
-const FLOW = ['containers', 'ckd', 'small_parts', 'welding', 'paint', 'plastic', 'pbs', 'assembly', 'qc', 'testtrack', 'finished']
+const FLOW = ['containers', 'ckd', 'small_parts', 'welding', 'paint', 'plastic', 'pbs', 'assembly', 'qc', 'cud', 'testtrack', 'finished', 'cskt', 'ric', 'boiler']
 
 export function ZoneList({
   plant,

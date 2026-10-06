@@ -17,10 +17,14 @@ const cabMat = paint('#e9ecef', 0.3, 0.4)
 const bumperMats = { raw: paint('#2b2d31', 0, 0.8), done: CAR_COLORS.map((c) => paint(c)) }
 const boothGlass = new MeshStandardMaterial({ color: '#cfe3f1', transparent: true, opacity: 0.22, depthWrite: false })
 
-/* ---------------- Склад CKD-комплектов (u 0–48) ---------------- */
+/*
+ * Склад CKD-комплектов — пристройка вдоль северо-восточной стены (u 60–200, v 195–227),
+ * доки смотрят на контейнерный терминал. Описан в собственной системе: x — вглубь от доков,
+ * z — вдоль стены; в корпус ставится поворотом (см. Warehouse).
+ */
 
-const RACK_ROWS = [7, 13.2, 26, 32.2] // u, пары стеллажей спина к спине
-const AISLES = [19.6, 39]
+const RACK_ROWS = [9, 14.2, 25, 30.2] // пары стеллажей спина к спине
+const AISLES = [4.5, 19.6]
 const BAY = 2.8
 const LEVELS = [0.15, 2.25, 4.35, 6.45]
 
@@ -30,9 +34,9 @@ function Racks() {
     const beams: Item[] = []
     const boxes: Item[] = []
     for (const u of RACK_ROWS) {
-      for (let v = 14; v <= 212; v += BAY) {
+      for (let v = 14; v <= 150; v += BAY) {
         uprights.push({ p: [u, 4, -v], s: [1.1, 8, 0.12] })
-        if (v + BAY > 212) continue
+        if (v + BAY > 150) continue
         for (const [li, y] of LEVELS.entries()) {
           if (li > 0) beams.push({ p: [u, y - 0.08, -(v + BAY / 2)], s: [1.15, 0.14, BAY] })
           // заполненность ~80%, детерминированно
@@ -75,7 +79,7 @@ function Forklift({ u, v0, v1, phase }: { u: number; v0: number; v1: number; pha
   )
 }
 
-/** Контейнерный тягач у докового шлюза (снаружи торцевой стены u = 0). */
+/** Контейнерный тягач у докового шлюза (снаружи стены, x < 0). */
 function DockTruck({ v }: { v: number }) {
   return (
     <group position={[-10.5, 0, -v]}>
@@ -87,14 +91,14 @@ function DockTruck({ v }: { v: number }) {
 }
 
 function Warehouse() {
-  const docks = [34, 62, 90, 118, 146, 174, 202]
+  const docks = [20, 40, 60, 80, 100, 120, 140]
   return (
-    <group>
+    // x склада → v = 227 − x, z склада → u = 46 − z
+    <group position={[46, 0, -227]} rotation={[0, -Math.PI / 2, 0]}>
       <Racks />
-      <Forklift u={AISLES[0]} v0={20} v1={200} phase={0} />
-      <Forklift u={AISLES[0]} v0={30} v1={190} phase={2.4} />
-      <Forklift u={AISLES[1]} v0={16} v1={205} phase={1.2} />
-      <Forklift u={44} v0={25} v1={200} phase={3.7} />
+      <Forklift u={AISLES[0]} v0={16} v1={146} phase={0} />
+      <Forklift u={AISLES[0]} v0={30} v1={140} phase={2.4} />
+      <Forklift u={AISLES[1]} v0={16} v1={148} phase={1.2} />
       {docks.map((v, i) => (
         <group key={v}>
           <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.6, 3.6, 3.4]} position={[0, 1.8, -v]} />
@@ -102,17 +106,17 @@ function Warehouse() {
           {i % 3 !== 1 && <DockTruck v={v} />}
         </group>
       ))}
-      <Label position={[24, 10, -110]} color="#4f8cff" small>
+      <Label position={[18, 10, -80]} color="#4f8cff" small>
         Стеллажи хранения машинокомплектов
       </Label>
     </group>
   )
 }
 
-/* ---------------- Тягач-AGV: склад → линии сварки и обратно ---------------- */
+/* ---------------- Тягач-AGV: склад → вдоль сборочных линий и обратно ---------------- */
 
 function Tugger() {
-  const path = useMemo(() => makePath([[46, 0, -55], [156, 0, -55], [156, 0, -100.5], [46, 0, -100.5], [46, 0, -55]] as P3[], 4), [])
+  const path = useMemo(() => makePath([[62, 0, -191], [214, 0, -191], [214, 0, -178], [62, 0, -178], [62, 0, -191]] as P3[], 4), [])
   const len = useMemo(() => path.getLength(), [path])
   const refs = useRef<(Group | null)[]>([])
   useFrame(({ clock }) => {
@@ -136,12 +140,12 @@ function Tugger() {
   )
 }
 
-/* ---------------- Мелкоузловая сборка (u 52–150, v 0–52) ---------------- */
+/* ---------- Мелкоузловая сборка ЦМУС и ЦМУС-2 (u 2–55, v 138–190), источники НДВ 0025–0033 ---------- */
 
 function SmallParts() {
   const benches = useMemo(() => {
     const out: { u: number; v: number }[] = []
-    for (let u = 60; u <= 110; u += 10) for (const v of [12, 26, 40]) out.push({ u, v })
+    for (const u of [10, 20, 30]) for (const v of [143, 153, 170, 180]) out.push({ u, v })
     return out
   }, [])
   const tables: Item[] = benches.map((b) => ({ p: [b.u, 0.5, -b.v], s: [4, 1, 2] }))
@@ -156,8 +160,8 @@ function SmallParts() {
         <Worker key={i} position={[b.u + (i % 2 ? 1 : -1), 0, -(b.v - 1.8)]} yaw={Math.PI / 2} phase={i * 0.9} />
       ))}
       {/* роботизированные ячейки с поворотным столом */}
-      {[124, 140].map((u, i) => (
-        <group key={u} position={[u, 0, -26]}>
+      {[148, 175].map((v, i) => (
+        <group key={v} position={[45, 0, -v]}>
           <mesh geometry={unitBox} material={MAT.darkSteel} scale={[3.4, 0.9, 3.4]} position={[0, 0.45, 0]} />
           <Robot position={[0, 0, 3.2]} yaw={Math.PI / 2} tool="gun" phase={i * 2} speed={1.5} />
           <Robot position={[0, 0, -3.2]} yaw={-Math.PI / 2} tool="gripper" phase={i * 2 + 1} speed={1.1} />
@@ -167,7 +171,10 @@ function SmallParts() {
   )
 }
 
-/* ---------------- Окраска пластиковых деталей (u 160–222, v 0–52) ---------------- */
+/*
+ * Цех окраски пластика (u 220–244, v 95–152), источники НДВ 0023–0024. Описан в собственной
+ * системе (x вдоль конвейера) и ставится в корпус поворотом на 90°: v = x − 66, u = 252 − z.
+ */
 
 function Plastic() {
   const path = useMemo(() => makePath([[164, 2.2, -28], [219, 2.2, -28], [219, 2.2, -9], [164, 2.2, -9], [164, 2.2, -28]] as P3[], 3), [])
@@ -184,7 +191,7 @@ function Plastic() {
     })
   })
   return (
-    <group>
+    <group position={[252, 0, 66]} rotation={[0, Math.PI / 2, 0]}>
       {/* кабина: 6 роботов (nur.kz) */}
       <group position={[188, 0, -28]}>
         <mesh geometry={unitBox} material={boothGlass} scale={[34, 4.6, 0.08]} position={[0, 2.3, 4.2]} />
@@ -206,14 +213,14 @@ function Plastic() {
   )
 }
 
-/* ---------------- Буфер окрашенных кузовов (u 160–222, v 56–96) ---------------- */
+/* ---------------- Буфер окрашенных кузовов (u 300–356, v 10–85) ---------------- */
 
 function Pbs() {
   const cars = useMemo(() => {
     const out: ParkedCar[] = []
     let k = 0
-    for (let u = 166; u <= 214; u += 6)
-      for (const v of [62, 70, 78, 86]) {
+    for (let u = 304; u <= 352; u += 6)
+      for (const v of [18, 28, 38, 48, 58, 68, 78]) {
         // кузова на двух ярусах стеллажа
         out.push({ p: [u, 0.5, -v], r: Math.PI / 2, color: CAR_COLORS[k++ % 5] })
         if ((u + v) % 4 === 0) out.push({ p: [u, 3.3, -v], r: Math.PI / 2, color: CAR_COLORS[k++ % 5] })
@@ -222,7 +229,7 @@ function Pbs() {
   }, [])
   const shelves = useMemo(() => {
     const out: Item[] = []
-    for (let u = 166; u <= 214; u += 6) out.push({ p: [u, 3, -74], s: [2.2, 0.15, 34] })
+    for (let u = 304; u <= 352; u += 6) out.push({ p: [u, 3, -48], s: [2.2, 0.15, 66] })
     return out
   }, [])
   return (

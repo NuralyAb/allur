@@ -10,7 +10,10 @@ import { Robot } from './Robot'
 import { Worker } from './Worker'
 
 /*
- * Цех окраски кузовов. Проход 1 — подготовка поверхности в 13 ваннах окунанием,
+ * Цех окраски кузовов (ЦОК). Положение — по источникам 0013–0022 проекта НДВ (печи ED, УГД,
+ * USB, вторичного грунта, базы и лака): юго-восточная часть корпуса. Ниже цех описан в
+ * собственной системе (проходы вдоль оси a), а в корпус ставится поворотом на 90° — см. Paint().
+ * Проход 1 — подготовка поверхности в 13 ваннах окунанием,
  * 10-я ванна — катодное электроосаждение грунта (nur.kz). Проход 2 — печь
  * катафореза и герметизация швов. Проход 3 — кабины грунта, базы и лака (роботы).
  * Проход 4 — печь финишной сушки, выход в буфер окрашенных кузовов.
@@ -23,9 +26,9 @@ const KTL = 9 // индекс 10-й ванны
 const LIQUID = ['#cfd9c9', '#cfd9c9', '#9fc5e3', '#9fc5e3', '#b9d3cf', '#c9d6b6', '#9fc5e3', '#b5c9d9', '#a8d1ec', '#2b2f35', '#9db3c7', '#9db3c7', '#a8d1ec']
 
 const V1 = 212
-const V2 = 180
-const V3 = 145
-const V4 = 118
+const V2 = 196
+const V3 = 180
+const V4 = 164
 const SPACING = 7.5
 const SPEED = 0.9 // м/с
 
@@ -37,8 +40,7 @@ const PATH: P3[] = [
   [166, 0.55, -V3],
   [262, 0.55, -V3],
   [262, 0.55, -V4],
-  [166, 0.55, -V4],
-  [166, 0.55, -104],
+  [150, 0.55, -V4],
 ]
 
 // участки прохода 3 (u)
@@ -87,7 +89,7 @@ function Bodies() {
         c.setBody(u < PRIMER[1] - 4 ? MAT.ed : u < BASE[0] + 12 ? MAT.primer : paint(CAR_COLORS[i % 5]))
       } else if (Math.abs(p.z + V2) < 0.5) {
         c.setBody(MAT.ed)
-      } else if (Math.abs(p.z + V4) < 0.5 || p.z > -110) {
+      } else if (Math.abs(p.z + V4) < 0.5) {
         c.setBody(paint(CAR_COLORS[i % 5]))
       }
     })
@@ -201,18 +203,21 @@ function Booth({ u0, u1, label, robotsPerSide }: { u0: number; u1: number; label
 function Enclosure() {
   const items = useMemo(
     () => [
-      { p: [214, 3, -100] as [number, number, number], s: [108, 6, 0.12] as [number, number, number] },
-      { p: [160, 3, -163.5] as [number, number, number], s: [0.12, 6, 127] as [number, number, number] },
-      { p: [268, 3, -163.5] as [number, number, number], s: [0.12, 6, 127] as [number, number, number] },
+      { p: [213, 3, -158] as [number, number, number], s: [110, 6, 0.12] as [number, number, number] },
+      { p: [213, 3, -222] as [number, number, number], s: [110, 6, 0.12] as [number, number, number] },
+      // проём для выхода кузовов в буфер на проходе V4
+      { p: [158, 3, -196] as [number, number, number], s: [0.12, 6, 52] as [number, number, number] },
+      { p: [268, 3, -190] as [number, number, number], s: [0.12, 6, 64] as [number, number, number] },
     ],
     [],
   )
   return <Instanced geometry={unitBox} material={boothGlass} items={items} />
 }
 
+/** Перевод собственной системы цеха в корпус: a → v = a − 66, проход p → u = 470 − p. */
 export function Paint() {
   return (
-    <group>
+    <group position={[470, 0, 66]} rotation={[0, Math.PI / 2, 0]}>
       <Enclosure />
       <Tanks />
       <Oven u0={205} u1={258} v={V2} label="Печь сушки катафореза" />
