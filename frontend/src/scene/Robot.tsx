@@ -1,4 +1,4 @@
-import { useFrame } from '@react-three/fiber'
+import { useProductionFrame, useProductionEnabled } from '../simulation/ProductionClock'
 import { useRef } from 'react'
 import { Color, MeshBasicMaterial, SphereGeometry, type Group, type Material, type Mesh } from 'three'
 import { MAT, unitBox, unitCyl } from './assets'
@@ -25,13 +25,14 @@ interface Props {
 
 /** Шестиосевой промышленный робот (силуэт ABB IRB 6700-класса). */
 export function Robot({ position, yaw = 0, tool = 'gun', phase = 0, speed = 1, scale = 1, material = MAT.robot, active }: Props) {
+  const simulated = useProductionEnabled()
   const turret = useRef<Group>(null!)
   const shoulder = useRef<Group>(null!)
   const elbow = useRef<Group>(null!)
   const wrist = useRef<Group>(null!)
   const fx = useRef<Mesh>(null!)
 
-  useFrame(({ clock }) => {
+  useProductionFrame(({ clock }, delta) => {
     const t = clock.elapsedTime * speed + phase
     const on = active ? active(clock.elapsedTime) : true
     const a = on ? 1 : 0.25
@@ -41,7 +42,7 @@ export function Robot({ position, yaw = 0, tool = 'gun', phase = 0, speed = 1, s
     wrist.current.rotation.x = Math.sin(t * 2.1) * 0.8 * a
     if (fx.current) {
       const flicker = tool === 'gun' ? Math.sin(t * 23) > 0.2 : true
-      fx.current.visible = on && flicker
+      fx.current.visible = on && flicker && (!simulated || delta > 0)
       if (tool === 'gun') fx.current.scale.setScalar(0.04 + (Math.sin(t * 71) * 0.5 + 0.5) * 0.07)
     }
   })

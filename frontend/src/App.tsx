@@ -4,7 +4,7 @@ import { Scene, outdoorShot, overviewShot, zoneShot, type Shot } from './scene/S
 import { hallToWorld } from './scene/geo'
 import { buildTour } from './scene/tour'
 import type { Alert, DataSource, Insights, Kpi, LiveState, OutdoorZone, Plant, Selection, Site, Zone } from './types'
-import { TopBar, KpiCards, fmtDate } from './ui/TopBar'
+import { TopBar, KpiCards, SimulationKpiCards, fmtDate } from './ui/TopBar'
 import { Icon } from './ui/Icon'
 import { SceneBoundary } from './ui/SceneBoundary'
 import type { LightMood } from './scene/Lighting'
@@ -15,6 +15,9 @@ import { AnalyticsPanel } from './ui/AnalyticsPanel'
 import { DecisionsPanel } from './ui/DecisionsPanel'
 import { SourcePanel } from './ui/SourcePanel'
 import { LiveStrip } from './ui/LiveStrip'
+import { useSimulation } from './simulation/useSimulation'
+import { SimulationPanel, SimulationTransport } from './ui/SimulationPanel'
+import type { Stage } from './simulation/types'
 
 const STEP_MS = 9000
 
@@ -77,18 +80,22 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
   const [analytics, setAnalytics] = useState(false)
   const [decisions, setDecisions] = useState(false)
   const [navigation, setNavigation] = useState(false)
+  const [simulationMode, setSimulationMode] = useState(false)
+  const [simulationPanel, setSimulationPanel] = useState(true)
+  const simulation = useSimulation(simulationMode)
 
   useEffect(() => {
     if (analytics || decisions || sourceOpen) return
     const closePanel = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      if (simulationMode) { setSimulationPanel(false); return }
       if (navigation) setNavigation(false)
       else if (help) setHelp(false)
       else setSelection(null)
     }
     window.addEventListener('keydown', closePanel)
     return () => window.removeEventListener('keydown', closePanel)
-  }, [analytics, decisions, sourceOpen, navigation, help])
+  }, [analytics, decisions, sourceOpen, navigation, help, simulationMode])
 
   useEffect(() => {
     const desktop = window.matchMedia('(min-width: 961px)')
@@ -111,6 +118,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
   const goTo = useCallback(
     (i: number) => {
       const s = tour[i]
+      if (!s || !Number.isInteger(i)) return
       setNavigation(false)
       setStep(i)
       setRoof(s.roof)
@@ -125,7 +133,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
     const n = Number(q.get('step'))
-    if (n >= 1 && n <= tour.length) goTo(n - 1)
+    if (Number.isInteger(n) && n >= 1 && n <= tour.length) goTo(n - 1)
     const cam = q.get('cam')?.split(',').map(Number)
     if (cam?.length === 6 && cam.every(Number.isFinite)) {
       setRoof(q.get('roof') === '1')
@@ -154,9 +162,10 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
   }
   const showArea = (area: string) => {
     const zone = plant.zones.find((z) => z.kpiArea === area)
-    if (zone) { setAnalytics(false); setDecisions(false); selectZone(zone) }
+    if (zone) { setAnalytics(false); setDecisions(false); setSimulationMode(false); selectZone(zone) }
   }
   const selectOutdoor = (z: OutdoorZone) => {
+    setRoof(true)
     setNavigation(false)
     setStep(null)
     setPlaying(false)
@@ -164,12 +173,32 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
     setShot(outdoorShot(z))
   }
 
+  const selectAsset = (stage: Stage) => {
+    setRoof(false); setPlaying(false); setStep(null)
+    const [u, v] = stage.position
+    setShot(stage.stage === 'assembly'
+      ? { camera: hallToWorld(plant.hall, 100, -130, 210), target: hallToWorld(plant.hall, 210, 95, 0) }
+      : { camera: hallToWorld(plant.hall, u - 35, v - 50, 42), target: hallToWorld(plant.hall, u, v, 2) })
+  }
+  const toggleSimulation = async () => {
+    if (simulation.busy) return
+    if (simulationMode) {
+      await simulation.control('pause')
+      setSimulationMode(false); setShot(overviewShot(plant)); setRoof(true)
+    } else {
+      setPlaying(false); setStep(null); setSelection(null); setNavigation(false)
+      setSimulationPanel(true); setSimulationMode(true); setRoof(false)
+      const area = plant.zones.find((z) => z.id === 'assembly')!
+      setShot(zoneShot(plant, area))
+    }
+  }
+
   const overview = () => { setNavigation(false); setPlaying(false); setStep(null); setSelection(null); setShot(overviewShot(plant)) }
   const openAnalytics = () => { setNavigation(false); setPlaying(false); setAnalytics(true) }
   const openDecisions = () => { setNavigation(false); setPlaying(false); setDecisions(true) }
   // сцена тяжёлая: пересоздаём элемент только при изменении её входов, а не на каждом сообщении потока
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const scene = useMemo(() => <Scene plant={plant} site={site} roof={roof} labels={labels} selection={selection} status={sceneStatus} alerts={sceneAlerts} shot={shot} mood={mood} detailed={detailed} onSelectZone={selectZone} onSelectOutdoor={selectOutdoor} onUserMove={() => setPlaying(false)} />, [plant, site, roof, labels, selection, sceneStatus, sceneAlerts, shot, mood, detailed])
+  const scene = useMemo(() => <Scene plant={plant} site={site} roof={roof} labels={labels} selection={selection} status={sceneStatus} alerts={sceneAlerts} shot={shot} mood={mood} detailed={detailed} onSelectZone={selectZone} onSelectOutdoor={selectOutdoor} simulation={simulationMode ? simulation.snapshot : null} onSelectAsset={selectAsset} onUserMove={() => setPlaying(false)} />, [plant, site, roof, labels, selection, sceneStatus, sceneAlerts, shot, mood, detailed, simulationMode, simulation.snapshot])
   const bottleneck = plant.zones.find(z => z.kpiArea === insights.base.bottleneck)
 
   return (
@@ -177,18 +206,18 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
       <a className="skip-link" href="#main-content">Перейти к рабочей области</a>
       {navigation && <button className="navigation-backdrop" aria-label="Закрыть навигацию" onClick={() => setNavigation(false)} />}
       <ZoneList open={navigation} plant={plant} status={insights.status} insights={insights} selection={selection} onZone={selectZone} onOutdoor={selectOutdoor} onClose={() => setNavigation(false)} onOverview={overview} onAnalytics={openAnalytics} onDecisions={openDecisions} />
-      <TopBar plant={plant} kpi={kpi} insights={insights} sourceLabel={sourceLabel} live={!!live?.running} onSource={() => { setPlaying(false); setSourceOpen(true) }} onDecisions={openDecisions} navigation={navigation} onNavigation={() => { setPlaying(false); setNavigation(v => !v) }} onAnalytics={openAnalytics} />
+      <TopBar plant={plant} kpi={kpi} insights={insights} sourceLabel={sourceLabel} live={!!live?.running} onSource={() => { setPlaying(false); setSourceOpen(true) }} onDecisions={openDecisions} simulationMode={simulationMode} connected={simulation.connected} busy={simulation.busy} onSimulation={() => void toggleSimulation()} navigation={navigation} onNavigation={() => { setPlaying(false); setNavigation(v => !v) }} onAnalytics={openAnalytics} />
       <main inert={navigation} className="dashboard" id="main-content">
         <div className="page-heading"><div><div className="page-eyebrow"><span />ПРОИЗВОДСТВЕННАЯ ПЛОЩАДКА</div><h1>Завод в деталях<span className="heading-dot">.</span></h1><p>Производство, процессы и решения — в одном пространстве.</p></div><div className="page-actions"><span className="date-chip"><Icon name="clock" size={15} />{fmtDate(kpi.date)}<span className="date-divider" />{sourceLabel}</span><button className="button-primary" onClick={openAnalytics}><Icon name="chart" size={16} />Аналитика<Icon name="arrow-right" size={15} /></button></div></div>
-        <KpiCards kpi={kpi} insights={insights} onAnalytics={openAnalytics} onDecisions={openDecisions} />
-        {live?.shift && <LiveStrip shift={live.shift} onArea={showArea} />}
+        {simulationMode ? <SimulationKpiCards simulation={simulation.snapshot} /> : <KpiCards kpi={kpi} insights={insights} onAnalytics={openAnalytics} onDecisions={openDecisions} />}
+        {!simulationMode && live?.shift && <LiveStrip shift={live.shift} onArea={showArea} />}
         <section className={`scene-stage${selection ? ' has-selection' : ''}${step !== null ? ' touring' : ''}`} aria-label="Интерактивная 3D-модель завода">
           <div className="scene-canvas"><SceneBoundary>{scene}</SceneBoundary></div>
           <div className="stage-toolbar"><div className="stage-title"><span className="stage-icon"><Icon name="box" size={18} /></span><div><strong>Цифровой двойник</strong><span>Интерактивная модель площадки</span></div><span className="stage-badge">3D</span></div><div className="stage-modes" role="group" aria-label="Отображение завода"><button aria-pressed={roof} className={roof ? 'active' : ''} onClick={() => { setPlaying(false); setRoof(true) }}><Icon name="roof" size={15} />Площадка</button><button aria-pressed={!roof} className={!roof ? 'active' : ''} onClick={() => { setPlaying(false); setRoof(false) }}><Icon name="layers" size={15} />Цеха</button></div><div className="stage-actions"><button className="icon-button" aria-label={mood === 'day' ? 'Включить вечернее освещение' : 'Включить дневное освещение'} title={mood === 'day' ? 'Свет: день' : 'Свет: золотой час'} onClick={() => setMood(mood === 'day' ? 'sunset' : 'day')}><Icon name={mood === 'day' ? 'sun' : 'moon'} /></button><button className={`icon-button${detailed ? ' selected' : ''}`} aria-pressed={detailed} aria-label="Детальное качество изображения" title={detailed ? 'Качество: высокое. Нажмите для экономичного режима' : 'Качество: экономичное. Нажмите для высокого качества'} onClick={() => setDetailed(v => !v)}><Icon name="settings" /></button><button className={`icon-button${help ? ' selected' : ''}`} aria-label="Как управлять моделью" aria-expanded={help} aria-controls="scene-help" onClick={() => setHelp(v => !v)}><Icon name="info" /></button></div></div>
           {help && <div className="scene-help" id="scene-help"><strong>Исследуйте завод</strong><p>Перетаскивание — поворот камеры.<br />Колесо мыши — приближение.<br />Правая кнопка — перемещение.</p><p>На телефоне: один палец — поворот,<br />два пальца — масштаб и перемещение.</p><span>Выберите участок, чтобы увидеть детали.</span><button className="text-button" onClick={() => setHelp(false)}>Понятно <Icon name="check" size={14} /></button></div>}
           <div className="scene-topline"><span className="model-note"><span />{roof ? 'Внешний вид площадки' : 'Внутреннее устройство'}<span className="model-note-divider">/</span>Реконструкция</span>{bottleneck && <button className="bottleneck-chip" onClick={() => selectZone(bottleneck)}><Icon name="alert" size={13} />Узкое место: {insights.base.bottleneck.toLowerCase()}<Icon name="chevron-right" size={13} /></button>}</div>
-          <div className="scene-panels"><ZonePanel key={selection?.zone.id} plant={plant} kpi={kpi} insights={insights} onDecisions={openDecisions} selection={selection} onClose={() => setSelection(null)} /></div>
-          <div className="scene-bottom"><div className="scene-legend"><span><i className="legend-ok" />В норме</span><span><i className="legend-warn" />Внимание</span><span><i className="legend-bad" />Отклонение</span></div><TourBar stops={tour} index={step} playing={playing} roof={roof} labels={labels} onPlay={() => { setPlaying(true); goTo(step === null || step >= tour.length - 1 ? 0 : step) }} onStop={() => setPlaying(false)} onStep={goTo} onRoof={() => { setPlaying(false); setRoof(r => !r) }} onLabels={() => setLabels(l => !l)} onOverview={overview} /><div className="scene-hint"><Icon name="rotate" size={13} />Вращайте · приближайте · исследуйте</div></div>
+          <div className="scene-panels">{simulationMode ? simulationPanel && <SimulationPanel simulation={simulation} onAsset={selectAsset} onHide={() => setSimulationPanel(false)} /> : <ZonePanel key={selection?.zone.id} plant={plant} kpi={kpi} insights={insights} onDecisions={openDecisions} selection={selection} onClose={() => setSelection(null)} />}</div>
+          <div className="scene-bottom"><div className="scene-legend"><span><i className="legend-ok" />В норме</span><span><i className="legend-warn" />Внимание</span><span><i className="legend-bad" />Отклонение</span></div>{simulationMode ? <SimulationTransport simulation={simulation} panel={simulationPanel} onPanel={() => setSimulationPanel((v) => !v)} roof={roof} onRoof={() => setRoof((v) => !v)} onOverview={() => { setShot(overviewShot(plant)); setRoof(true) }} /> : <TourBar stops={tour} index={step} playing={playing} roof={roof} labels={labels} onPlay={() => { setPlaying(true); goTo(step === null || step >= tour.length - 1 ? 0 : step) }} onStop={() => setPlaying(false)} onStep={goTo} onRoof={() => { setPlaying(false); setRoof(r => !r) }} onLabels={() => setLabels(l => !l)} onOverview={overview} />}<div className="scene-hint"><Icon name="rotate" size={13} />Вращайте · приближайте · исследуйте</div></div>
         </section>
         <footer className="workspace-footer"><span><span className="footer-dot" />{source?.source ?? 'Данные кейса'} · {fmtDate(kpi.date)}<span className="footer-separator">|</span>Движение в сцене — симуляция</span><span className="attrib">© OpenStreetMap · Esri World Imagery<span className="footer-separator">|</span>Расстановка: НДВ, 2022</span></footer>
       </main>

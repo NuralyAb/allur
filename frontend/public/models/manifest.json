@@ -1,7 +1,14 @@
 {
-  "_comment": "Exact Chevrolet Onix, Chevrolet Cobalt, JAC J7 and Allur conveyor GLB assets have not been supplied yet. Null entries keep the existing scene. Add only verified models with source, author and license metadata.",
+  "_comment": "Null entries retain the existing scene. Added models are user-selected; verify their exact model generation, source and license.",
   "cars": {
-    "onix": null,
+    "onix": {
+      "url": "/models/onix-c1bb20bcc2b636e8.glb",
+      "length": 4.474,
+      "rotationY": -1.5707963267948966,
+      "source": "https://sketchfab.com/3d-models/chevrolet-onix-bfd798c2695847b28ab681d42abc7056",
+      "author": "uzb_rx7 (uzbek_supra)",
+      "license": "CC-BY-4.0"
+    },
     "cobalt": null,
     "j7": null
   },

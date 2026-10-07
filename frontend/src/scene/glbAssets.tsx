@@ -18,7 +18,7 @@ export interface GlbAssetsRegistry {
   conveyor: GlbAssetSpec | null
 }
 
-// Exact vehicle/equipment assets have not been supplied or downloaded yet.
+// Render lightweight geometry while the manifest loads, and for unfilled slots.
 // Null entries retain the existing scene without requesting missing GLB files.
 const DEFAULT_ASSETS: GlbAssetsRegistry = {
   cars: { onix: null, cobalt: null, j7: null },

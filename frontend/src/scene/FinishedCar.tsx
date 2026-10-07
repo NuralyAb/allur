@@ -20,7 +20,7 @@ export const FinishedCar = forwardRef<Group, {
   })
   return (
     <group ref={ref}>
-      <OptionalGlb spec={spec} enabled={detailed}>
+      <OptionalGlb spec={spec} enabled={detailed} speed={1.1}>
         <Car ref={fallback} model={model} body={body} glass={MAT.glass} wheels details />
       </OptionalGlb>
     </group>

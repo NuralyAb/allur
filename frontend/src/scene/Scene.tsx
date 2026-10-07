@@ -18,6 +18,9 @@ import { HallZones, OutdoorZones } from './Zones'
 import type { Alert, Level } from '../types'
 import { Lighting, type LightMood } from './Lighting'
 import { GlbAssetsProvider } from './glbAssets'
+import { ProductionProvider, StageScope } from '../simulation/ProductionClock'
+import type { SimulationSnapshot, Stage } from '../simulation/types'
+import { ProductionFlow } from './ProductionFlow'
 
 const debugPerf = new URLSearchParams(window.location.search).has('perf')
 
@@ -38,6 +41,8 @@ interface Props {
   shot: Shot | null
   mood: LightMood
   detailed: boolean
+  simulation?: SimulationSnapshot | null
+  onSelectAsset: (stage: Stage) => void
   onSelectZone: (z: Zone) => void
   onSelectOutdoor: (z: OutdoorZone) => void
   onUserMove: () => void
@@ -119,7 +124,7 @@ function SceneReady() {
   return null
 }
 
-export function Scene({ plant, site, roof, labels, status, alerts, selection, shot, mood, detailed, onSelectZone, onSelectOutdoor, onUserMove }: Props) {
+export function Scene({ plant, site, roof, labels, status, alerts, selection, shot, mood, detailed, simulation = null, onSelectAsset, onSelectZone, onSelectOutdoor, onUserMove }: Props) {
   const frame = plant.hall
   const outline = useMemo<XY[]>(() => site.hall.map((p) => worldToHall(frame, p)), [site, frame])
   const origin = world(frame.origin[0], frame.origin[1])
@@ -141,6 +146,7 @@ export function Scene({ plant, site, roof, labels, status, alerts, selection, sh
         <SceneReady />
       </Suspense>
 
+      <ProductionProvider snapshot={simulation}>
       {/* главный корпус в собственной системе координат (u, v) */}
       <group position={origin} rotation={[0, frame.angle, 0]}>
         <Hall frame={frame} outline={outline} roof={roof} />
@@ -148,18 +154,20 @@ export function Scene({ plant, site, roof, labels, status, alerts, selection, sh
         <BoilerAnnex />
         {!roof && (
           <>
-            <Welding />
-            <Paint />
+            <StageScope stage="welding"><Welding /></StageScope>
+            <StageScope stage="paint"><Paint /></StageScope>
             <GlbAssetsProvider>
-              <Assembly detailed={detailed} />
+              <StageScope stage="assembly"><Assembly detailed={detailed} /></StageScope>
             </GlbAssetsProvider>
             <Logistics />
             <Services />
           </>
         )}
+        {simulation && <ProductionFlow snapshot={simulation} roof={roof} onAsset={onSelectAsset} />}
       </group>
 
       <Outdoor frame={frame} zones={plant.outdoor} />
+      </ProductionProvider>
       <OutdoorZones zones={plant.outdoor} frame={frame} selection={selection} onSelect={onSelectOutdoor} labels={labels} />
 
       <CameraRig shot={shot ?? overview} onUserMove={onUserMove} />

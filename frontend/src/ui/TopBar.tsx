@@ -1,9 +1,10 @@
 import type { Insights, Kpi, Plant } from '../types'
+import { formatTime, type SimulationSnapshot } from '../simulation/types'
 import { Icon, type IconName } from './Icon'
 
 export const fmtDate = (d: string) => d.split('-').reverse().join('.')
 
-export function TopBar({ plant, kpi, sourceLabel, live, navigation, onNavigation, onAnalytics, onDecisions, onSource }: { plant: Plant; kpi: Kpi; insights: Insights; sourceLabel: string; live: boolean; navigation: boolean; onNavigation: () => void; onAnalytics: () => void; onDecisions: () => void; onSource: () => void }) {
+export function TopBar({ plant, kpi, sourceLabel, live, navigation, onNavigation, onAnalytics, onDecisions, onSource, simulationMode, connected, busy, onSimulation }: { plant: Plant; kpi: Kpi; insights: Insights; sourceLabel: string; live: boolean; navigation: boolean; onNavigation: () => void; onAnalytics: () => void; onDecisions: () => void; onSource: () => void; simulationMode: boolean; connected: boolean; busy: boolean; onSimulation: () => void }) {
   return (
     <header className="topbar" inert={navigation}>
       <div className="header-context">
@@ -13,8 +14,11 @@ export function TopBar({ plant, kpi, sourceLabel, live, navigation, onNavigation
       </div>
       <div className="header-actions">
         <span className="location-label" title={plant.address}><Icon name="pin" size={14} />Костанай, Казахстан</span>
-        <button className={`demo-badge source-badge${live ? ' live' : ''}`} onClick={onSource} title="Источник данных: загрузка, live, шаблон"><span />{sourceLabel}</button>
-        <button className="icon-button header-chart" onClick={onAnalytics} aria-label="Данные и аналитика"><Icon name="chart" /></button>
+        {simulationMode
+          ? <span className="demo-badge"><span />{connected ? 'Сценарный поток' : 'Сценарий · HTTP'}</span>
+          : <button className={`demo-badge source-badge${live ? ' live' : ''}`} onClick={onSource} title="Источник данных: загрузка, live, шаблон"><span />{sourceLabel}</button>}
+        <button className={`simulation-launch${simulationMode ? ' active' : ''}`} disabled={busy} aria-pressed={simulationMode} onClick={onSimulation}><Icon name={simulationMode ? 'arrow-left' : 'play'} size={14} />{simulationMode ? 'Вернуться к обзору' : 'Сценарии производства'}</button>
+        <button className="icon-button header-chart" onClick={onAnalytics} aria-label={simulationMode ? 'Данные кейса' : 'Данные и аналитика'}><Icon name="chart" /></button>
         <button className="icon-button" onClick={onDecisions} aria-label={`Центр решений · данные за ${fmtDate(kpi.date)}`} title="Центр решений"><Icon name="layers" /></button>
       </div>
     </header>
@@ -34,7 +38,19 @@ export function KpiCards({ kpi, insights, onAnalytics, onDecisions }: { kpi: Kpi
   </section>
 }
 
-function Metric({ label, value, unit, hint, status, icon, progress, badge, onClick }: { label: string; value: string; unit: string; hint: string; status: 'ok' | 'warn' | 'bad' | 'neutral'; icon: IconName; progress?: number; badge: string; onClick: () => void }) {
+/** Показатели сценарной смены — заменяют KPI кейса в режиме «Сценарии производства». */
+export function SimulationKpiCards({ simulation }: { simulation: SimulationSnapshot | null }) {
+  const s = simulation
+  return <section className="kpis simulation-kpis" aria-label="Показатели сценарной смены">
+    <Metric label="Годные · приёмка ОТК" value={s ? String(s.good) : '—'} unit="авто" hint="сценарная смена" status="ok" icon="check" badge="Приняты ОТК" />
+    <Metric label="В производстве" value={s ? String(s.wip) : '—'} unit="шт" hint="кузова и очереди" status="neutral" icon="factory" badge="Незавершённое производство" />
+    <Metric label="Карантин" value={s ? String(s.rejected) : '—'} unit="авто" hint="не прошли ОТК" status="warn" icon="alert" badge="На доработку" />
+    <Metric label="Простой сборки" value={s ? String(Math.floor(s.stages[2].durations.FAULT)) : '—'} unit="мин" hint="накоплено в этой смене" status={s?.faultUntil ? 'bad' : 'neutral'} icon="clock" badge={s?.faultUntil ? 'Идёт ремонт' : 'Без отказа'} />
+    <Metric label="Время смены" value={s ? formatTime(s.time) : '—'} unit="" hint={s?.completed ? 'смена завершена' : s?.running ? 'идёт симуляция' : 'симуляция на паузе'} status="neutral" icon="target" badge="Сценарий" />
+  </section>
+}
+
+function Metric({ label, value, unit, hint, status, icon, progress, badge, onClick }: { label: string; value: string; unit: string; hint: string; status: 'ok' | 'warn' | 'bad' | 'neutral'; icon: IconName; progress?: number; badge: string; onClick?: () => void }) {
   return <button className={`metric metric-${status}`} onClick={onClick}>
     <span className="metric-top"><span className="metric-label">{label}</span><Icon name={icon} size={16} /></span>
     <span className="metric-value">{value}<small>{unit}</small></span>

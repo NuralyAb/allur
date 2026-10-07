@@ -7,3 +7,5 @@ __pycache__/
 .vite/
 visual-audit/
 backend/data/
+test-results/
+playwright-report/
