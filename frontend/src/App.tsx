@@ -41,7 +41,7 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
   const tour = useMemo(() => buildTour(plant.hall), [plant])
   const [selection, setSelection] = useState<Selection>(null)
   const [roof, setRoof] = useState(true)
-  const [labels, setLabels] = useState(true)
+  const [labels, setLabels] = useState(false)
   const [shot, setShot] = useState<Shot | null>(null)
   const [step, setStep] = useState<number | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -113,6 +113,8 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
         labels={labels}
         selection={selection}
         shot={shot}
+        mood="sunset"
+        detailed={true}
         onSelectZone={selectZone}
         onSelectOutdoor={selectOutdoor}
         onUserMove={() => setPlaying(false)}

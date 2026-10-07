@@ -10,6 +10,7 @@ import { Label } from './Label'
 import { indexed, isDwelling, mod } from './motion'
 import { Robot } from './Robot'
 import { Worker } from './Worker'
+import { fenceTile } from './surfaces'
 
 /**
  * Цех сварки (ЦСК): у юго-западной стены, северо-западная половина корпуса — по
@@ -28,9 +29,9 @@ const SLOTS = 10 // 9 сварочных постов + рихтовка/гео�
 const PERIOD = 9 // такт демонстрации, с
 const MOVE = 2.6 // время переезда, с
 
-const fenceMat = new MeshStandardMaterial({ color: '#f2c200', transparent: true, opacity: 0.28, depthWrite: false })
-const laserCellMat = new MeshStandardMaterial({ color: '#25292f', transparent: true, opacity: 0.55, roughness: 0.3 })
-const laserWindow = new MeshBasicMaterial({ color: new Color(1.1, 0.12, 0.08), toneMapped: false, transparent: true, opacity: 0.45 })
+const fenceMat = new MeshStandardMaterial({ color: '#7b888b', alphaMap: fenceTile(), alphaTest: 0.4, roughness: 0.6, metalness: 0.4 })
+const laserCellMat = new MeshStandardMaterial({ color: '#25292f', transparent: true, opacity: 0.55, roughness: 0.3, depthWrite: false })
+const laserWindow = new MeshBasicMaterial({ color: new Color(1.1, 0.12, 0.08), toneMapped: false, transparent: true, opacity: 0.45, depthWrite: false })
 const scanMat = new MeshBasicMaterial({ color: new Color(0.2, 3, 0.6), toneMapped: false })
 
 function Line({ index, v, model, note, car }: { index: number; v: number; model: string; note: string; car: CarModelId | null }) {
@@ -72,6 +73,12 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
       })),
     [v, uEnd],
   )
+  const posts = useMemo(() => {
+    const out: { p: [number, number, number]; s: [number, number, number] }[] = []
+    for (const side of [1, -1]) for (let u = U0 - 5; u <= uEnd; u += 5)
+      out.push({ p: [u, 1.1, -(v + side * 5.6)], s: [0.1, 2.2, 0.1] })
+    return out
+  }, [v, uEnd])
 
   return (
     <group>
@@ -80,6 +87,7 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
       <mesh geometry={unitBox} material={MAT.yellow} scale={[uEnd - U0 + 6, 0.06, 0.12]} position={[(U0 + uEnd) / 2, 0.52, -(v + 0.8)]} />
       <mesh geometry={unitBox} material={MAT.yellow} scale={[uEnd - U0 + 6, 0.06, 0.12]} position={[(U0 + uEnd) / 2, 0.52, -(v - 0.8)]} />
       <Instanced geometry={unitBox} material={fenceMat} items={fence} />
+      <Instanced geometry={unitBox} material={MAT.yellow} items={posts} />
 
       {Array.from({ length: SLOTS }, (_, i) => (
         <Car key={i} ref={(c) => void (cars.current[i] = c)} model={car ?? pickModel(i)} />

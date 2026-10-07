@@ -22,7 +22,7 @@ export const MAT = {
   biw: paint('#b9bec4', 0.9, 0.38), // «белый кузов» — голый металл
   ed: paint('#3b3f45', 0.2, 0.7), // катафорезный грунт
   primer: paint('#c9c6bd', 0.05, 0.6),
-  glass: new MeshStandardMaterial({ color: '#16202b', metalness: 0.6, roughness: 0.08 }),
+  glass: new MeshStandardMaterial({ color: '#203547', metalness: 0.85, roughness: 0.07 }),
   opening: paint('#0d0f12', 0, 1),
   tyre: paint('#121314', 0, 0.85),
   steel: paint('#7d848c', 0.75, 0.4),
@@ -33,8 +33,8 @@ export const MAT = {
   robotDark: paint('#2a2d33', 0.4, 0.5),
   concrete: paint('#9aa0a6', 0, 0.95),
   floor: paint('#7f878f', 0.05, 0.75),
-  wall: paint('#d9dde1', 0.1, 0.7),
-  roof: paint('#3d434a', 0.3, 0.75),
+  wall: paint('#d1d8dc', 0.25, 0.58),
+  roof: paint('#626e79', 0.55, 0.46),
   blueRack: paint('#1f5fae', 0.4, 0.5),
   orangeRack: paint('#e46b12', 0.3, 0.55),
   carton: paint('#b48a5a', 0, 0.9),

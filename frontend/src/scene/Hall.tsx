@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import {
   ExtrudeGeometry,
   InstancedMesh,
@@ -6,15 +6,45 @@ import {
   Object3D,
   Shape,
   ShapeGeometry,
+  CanvasTexture,
+  SRGBColorSpace,
   type BufferGeometry,
   type Material,
 } from 'three'
 import type { HallFrame, XY } from '../types'
 import { MAT, unitBox } from './assets'
+import { surfaceTile } from './surfaces'
 
-const glassWall = new MeshStandardMaterial({ color: '#9fb6c8', metalness: 0.2, roughness: 0.1, transparent: true, opacity: 0.35 })
+const glassWall = new MeshStandardMaterial({ color: '#9fb6c8', metalness: 0.2, roughness: 0.1, transparent: true, opacity: 0.35, depthWrite: false })
 const skylight = new MeshStandardMaterial({ color: '#9ea7af', roughness: 0.4, metalness: 0.2 })
-const epoxy = new MeshStandardMaterial({ color: '#8d959c', roughness: 0.55, metalness: 0.05 })
+const epoxy = new MeshStandardMaterial({ color: '#a5afb4', map: surfaceTile('concrete', 1 / 12), roughness: 0.48, metalness: 0.12 })
+const roofFinish = new MeshStandardMaterial({ color: '#687580', map: surfaceTile('roof', 1 / 10), roughness: 0.48, metalness: 0.5 })
+const trim = new MeshStandardMaterial({ color: '#354854', roughness: 0.4, metalness: 0.6 })
+const panelRib = new MeshStandardMaterial({ color: '#a3b1b9', roughness: 0.55, metalness: 0.3 })
+const led = new MeshStandardMaterial({ color: '#f0f8ff', emissive: '#d8eaff', emissiveIntensity: 2.2, toneMapped: false })
+
+function FactorySign() {
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1024
+    canvas.height = 256
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#263b49'
+    ctx.fillRect(0, 0, 1024, 256)
+    ctx.fillStyle = '#ff4938'
+    ctx.font = 'bold 172px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('allur', 512, 179)
+    const map = new CanvasTexture(canvas)
+    map.colorSpace = SRGBColorSpace
+    return map
+  }, [])
+  useEffect(() => () => texture.dispose(), [texture])
+  return <mesh position={[0, 8, 0.32]}>
+    <planeGeometry args={[24, 6]} />
+    <meshStandardMaterial map={texture} roughness={0.45} metalness={0.15} />
+  </mesh>
+}
 
 /** Сетка колонн: шаг 24 м вдоль корпуса, ряды между технологическими линиями. */
 export const COLUMN_U = Array.from({ length: 14 }, (_, i) => 24 + i * 24)
@@ -98,6 +128,23 @@ export function Hall({ frame, outline, roof }: Props) {
       ),
     [H],
   )
+  const facadeRibs = useMemo(() => walls.flatMap((w) => {
+    const out: { p: [number, number, number]; s: [number, number, number]; r: number }[] = []
+    for (let x = -w.len / 2 + 2; x < w.len / 2; x += 3) {
+      out.push({ p: [w.mid[0] + Math.cos(w.rot) * x, wallH / 2 + 0.6, -w.mid[1] - Math.sin(w.rot) * x], s: [0.07, wallH - 1.2, 0.48], r: w.rot })
+    }
+    return out
+  }), [walls, wallH])
+  const ventilation = useMemo(() => {
+    const out: { p: [number, number, number]; s: [number, number, number] }[] = []
+    for (let u = 55; u < frame.length - 30; u += 38)
+      for (let v = 35; v < frame.width - 25; v += 55)
+        out.push({ p: [u, H + 1.2, -v], s: [4.8, 1.5, 3.2] })
+    return out
+  }, [frame, H])
+  const lights = useMemo(() => COLUMN_U.flatMap((u) => COLUMN_V.filter((v) => !clear(u, v)).map((v) => ({
+    p: [u + 1.5, H - 1.1, -v] as [number, number, number], s: [5, 0.12, 0.32] as [number, number, number],
+  }))), [H])
   return (
     <group>
       <mesh geometry={floorGeo} material={epoxy} position={[0, 0.03, 0]} receiveShadow />
@@ -109,17 +156,25 @@ export function Hall({ frame, outline, roof }: Props) {
           {/* сэндвич-панели */}
           <mesh geometry={unitBox} material={MAT.wall} scale={[w.len, wallH - 1.2, 0.4]} position={[0, 1.2 + (wallH - 1.2) / 2, 0]} castShadow receiveShadow />
           {roof && (
-            <mesh geometry={unitBox} material={glassWall} scale={[w.len * 0.96, 1.4, 0.45]} position={[0, H - 2.2, 0]} />
+            <>
+              <mesh geometry={unitBox} material={glassWall} scale={[w.len * 0.96, 1.4, 0.52]} position={[0, H - 2.2, 0]} />
+              <mesh geometry={unitBox} material={trim} scale={[w.len + 0.6, 0.32, 0.7]} position={[0, H + 0.45, 0]} castShadow />
+              <mesh geometry={unitBox} material={trim} scale={[w.len, 0.14, 0.55]} position={[0, H - 3, 0]} />
+              {w.len > 200 && <FactorySign />}
+            </>
           )}
         </group>
       ))}
 
       <Instanced geometry={unitBox} material={MAT.darkSteel} items={columns} castShadow />
+      <Instanced geometry={unitBox} material={panelRib} items={facadeRibs} />
+      {!roof && <Instanced geometry={unitBox} material={led} items={lights} />}
 
       {roof && (
         <group>
-          <mesh geometry={roofGeo} material={MAT.roof} position={[0, H, 0]} castShadow receiveShadow />
+          <mesh geometry={roofGeo} material={roofFinish} position={[0, H, 0]} castShadow receiveShadow />
           <Skylights frame={frame} />
+          <Instanced geometry={unitBox} material={trim} items={ventilation} castShadow />
         </group>
       )}
     </group>

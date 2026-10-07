@@ -23,12 +23,14 @@ export function Label({
   const group = useRef<Group>(null!)
   const div = useRef<HTMLDivElement>(null!)
   const wp = useMemo(() => new Vector3(), [])
-  const shown = useRef(true)
+  const shown = useRef(false)
 
   useFrame(({ camera }) => {
     if (!div.current) return
     const d = camera.position.distanceTo(group.current.getWorldPosition(wp))
-    const visible = small ? d < 120 : d > 60
+    // Hysteresis avoids flickering at a distance threshold. Start hidden so
+    // distant equipment labels do not flash for one frame when the roof opens.
+    const visible = small ? d < (shown.current ? 130 : 110) : d > (shown.current ? 50 : 70)
     if (visible !== shown.current) {
       shown.current = visible
       div.current.style.opacity = visible ? '1' : '0'
@@ -42,7 +44,7 @@ export function Label({
         <div
           ref={div}
           className={small ? 'tag tag-small' : 'tag'}
-          style={{ borderColor: color, pointerEvents: onClick ? 'auto' : 'none' }}
+          style={{ borderColor: color, opacity: 0, pointerEvents: 'none' }}
           onClick={(e) => {
             e.stopPropagation()
             onClick?.()

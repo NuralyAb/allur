@@ -3,11 +3,14 @@ import { useMemo } from 'react'
 import { DoubleSide, ExtrudeGeometry, MeshStandardMaterial, SRGBColorSpace, Shape } from 'three'
 import type { Site, XY } from '../types'
 import { world } from './geo'
+import { surfaceTile } from './surfaces'
 
 /** Границы спутниковой мозаики (Esri World Imagery, z17) в метрах площадки. */
 const SAT = { west: -624.29, east: 656.32, north: 757.78, south: -695.51 }
 
-const ctxWall = new MeshStandardMaterial({ color: '#c9cdd2', roughness: 0.85 })
+const ctxWall = new MeshStandardMaterial({ color: '#b4c0c7', roughness: 0.8 })
+const ctxRoof = new MeshStandardMaterial({ color: '#81909b', map: surfaceTile('roof', 1 / 12), roughness: 0.65, metalness: 0.25 })
+const contextMaterials = [ctxRoof, ctxWall]
 
 function shapeOf(poly: XY[]) {
   const s = new Shape()
@@ -29,7 +32,7 @@ function extrudeFootprint(poly: XY[], height: number) {
  * склад у контейнерной площадки и арочные ангары. center — метры, len × wid вдоль оси корпуса.
  */
 const EXTRA: { center: XY; len: number; wid: number; h: number; kind: 'box' | 'arch'; color: string }[] = [
-  { center: [-118, 165], len: 140, wid: 44, h: 10, kind: 'box', color: '#eef0f2' },
+  { center: [-118, 165], len: 140, wid: 44, h: 10, kind: 'box', color: '#b7c2c9' },
   { center: [-279, 216], len: 118, wid: 16, h: 8, kind: 'arch', color: '#a9b4bd' },
   { center: [-186, 138], len: 108, wid: 16, h: 8, kind: 'arch', color: '#a9b4bd' },
   { center: [-41, 181], len: 50, wid: 18, h: 8, kind: 'arch', color: '#a9b4bd' },
@@ -68,7 +71,7 @@ export function Ground({ site, hallAngle }: { site: Site; hallAngle: number }) {
 
       {/* соседние здания из OpenStreetMap */}
       {buildings.map((b) => (
-        <mesh key={b.id} geometry={b.geo} material={ctxWall} castShadow receiveShadow />
+        <mesh key={b.id} geometry={b.geo} material={contextMaterials} castShadow receiveShadow />
       ))}
 
       {EXTRA.map((e, i) => {

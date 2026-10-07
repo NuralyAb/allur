@@ -1,8 +1,8 @@
-import { CameraControls, Sky } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
-import { Bloom, EffectComposer } from '@react-three/postprocessing'
+import { CameraControls } from '@react-three/drei'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Bloom, EffectComposer, N8AO, Vignette } from '@react-three/postprocessing'
 import { Suspense, useEffect, useMemo, useRef } from 'react'
-import { ACESFilmicToneMapping, Vector3 } from 'three'
+import { ACESFilmicToneMapping, PCFShadowMap, Vector3 } from 'three'
 import type { Plant, Selection, Site, XY, Zone, OutdoorZone } from '../types'
 import { Assembly } from './Assembly'
 import { hallToWorld, world, worldToHall } from './geo'
@@ -15,6 +15,7 @@ import { BoilerAnnex, Services } from './Services'
 import { Welding } from './Welding'
 import { Perf } from './Perf'
 import { HallZones, OutdoorZones } from './Zones'
+import { Lighting, type LightMood } from './Lighting'
 
 const debugPerf = new URLSearchParams(window.location.search).has('perf')
 
@@ -30,6 +31,8 @@ interface Props {
   labels: boolean
   selection: Selection
   shot: Shot | null
+  mood: LightMood
+  detailed: boolean
   onSelectZone: (z: Zone) => void
   onSelectOutdoor: (z: OutdoorZone) => void
   onUserMove: () => void
@@ -55,13 +58,30 @@ export function outdoorShot(z: OutdoorZone): Shot {
   }
 }
 
+export function overviewShot(plant: Plant): Shot {
+  return {
+    target: hallToWorld(plant.hall, plant.hall.length / 2, plant.hall.width / 2, 0),
+    camera: hallToWorld(plant.hall, -250, -340, 470),
+  }
+}
+
 function CameraRig({ shot, onUserMove }: { shot: Shot | null; onUserMove: () => void }) {
   const ref = useRef<CameraControls>(null!)
+  const gl = useThree((s) => s.gl)
+  const target = useMemo(() => new Vector3(), [])
+  useFrame(({ camera }) => {
+    if (!shot || !ref.current) return
+    ref.current.getTarget(target)
+    const settled = camera.position.distanceToSquared(shot.camera) < 0.01 && target.distanceToSquared(shot.target) < 0.01
+    const value = String(settled)
+    if (gl.domElement.dataset.cameraSettled !== value) gl.domElement.dataset.cameraSettled = value
+  })
   useEffect(() => {
     if (!shot || !ref.current) return
+    gl.domElement.dataset.cameraSettled = 'false'
     ref.current.smoothTime = 1.1
     void ref.current.setLookAt(shot.camera.x, shot.camera.y, shot.camera.z, shot.target.x, shot.target.y, shot.target.z, true)
-  }, [shot])
+  }, [shot, gl])
   return (
     <CameraControls
       ref={ref}
@@ -75,39 +95,35 @@ function CameraRig({ shot, onUserMove }: { shot: Shot | null; onUserMove: () => 
   )
 }
 
-export function Scene({ plant, site, roof, labels, selection, shot, onSelectZone, onSelectOutdoor, onUserMove }: Props) {
+/** Marks the loaded scene after a rendered frame, for browser visual checks. */
+function SceneReady() {
+  const frames = useRef(0)
+  useFrame(({ gl }) => {
+    if (++frames.current === 3) gl.domElement.dataset.sceneReady = 'true'
+  })
+  return null
+}
+
+export function Scene({ plant, site, roof, labels, selection, shot, mood, detailed, onSelectZone, onSelectOutdoor, onUserMove }: Props) {
   const frame = plant.hall
   const outline = useMemo<XY[]>(() => site.hall.map((p) => worldToHall(frame, p)), [site, frame])
   const origin = world(frame.origin[0], frame.origin[1])
-  const sun = useMemo(() => new Vector3(-420, 520, 260), [])
+  const overview = useMemo(() => overviewShot(plant), [plant])
 
   return (
     <Canvas
-      shadows
-      dpr={[1, 1.75]}
-      gl={{ antialias: false, toneMapping: ACESFilmicToneMapping, powerPreference: 'high-performance' }}
-      camera={{ position: [-330, 330, 380], fov: 42, near: 0.5, far: 9000 }}
+      shadows={{ type: PCFShadowMap }}
+      dpr={detailed ? [1, 1.5] : [1, 1]}
+      // Centimetre-separated floors and markings must stay distinct over the
+      // entire 4–1600 m zoom range. N8AO supports logarithmic depth as well.
+      gl={{ antialias: false, logarithmicDepthBuffer: true, toneMapping: ACESFilmicToneMapping, powerPreference: 'high-performance' }}
+      camera={{ position: overview.camera.toArray(), fov: 45, near: 0.25, far: 3500 }}
     >
-      <color attach="background" args={['#a9c4dd']} />
-      <fog attach="fog" args={['#b8cde0', 900, 3800]} />
-      <Sky sunPosition={sun} turbidity={6} rayleigh={1.2} mieCoefficient={0.004} />
-      <hemisphereLight args={['#dfefff', '#5a5446', 0.9]} />
-      <directionalLight
-        position={sun}
-        intensity={2.4}
-        castShadow
-        shadow-mapSize={[4096, 4096]}
-        shadow-bias={-0.0004}
-        shadow-camera-left={-420}
-        shadow-camera-right={420}
-        shadow-camera-top={420}
-        shadow-camera-bottom={-420}
-        shadow-camera-near={10}
-        shadow-camera-far={1800}
-      />
+      <Lighting mood={mood} detailed={detailed} />
 
       <Suspense fallback={null}>
         <Ground site={site} hallAngle={frame.angle} />
+        <SceneReady />
       </Suspense>
 
       {/* главный корпус в собственной системе координат (u, v) */}
@@ -129,11 +145,13 @@ export function Scene({ plant, site, roof, labels, selection, shot, onSelectZone
       <Outdoor frame={frame} zones={plant.outdoor} />
       <OutdoorZones zones={plant.outdoor} frame={frame} selection={selection} onSelect={onSelectOutdoor} labels={labels} />
 
-      <CameraRig shot={shot} onUserMove={onUserMove} />
+      <CameraRig shot={shot ?? overview} onUserMove={onUserMove} />
       {debugPerf && <Perf />}
 
       <EffectComposer multisampling={4}>
-        <Bloom mipmapBlur luminanceThreshold={1} intensity={0.9} radius={0.6} />
+        <N8AO enabled={detailed} aoRadius={3} intensity={1.2} distanceFalloff={1} quality="medium" halfRes />
+        <Bloom mipmapBlur luminanceThreshold={1.5} intensity={0.3} radius={0.55} />
+        <Vignette offset={0.25} darkness={0.22} />
       </EffectComposer>
     </Canvas>
   )

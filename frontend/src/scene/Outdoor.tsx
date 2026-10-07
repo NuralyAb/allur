@@ -1,7 +1,7 @@
 import { Line } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
-import { CatmullRomCurve3, Vector3, type Group } from 'three'
+import { CatmullRomCurve3, MeshStandardMaterial, Vector3, type Group } from 'three'
 import type { HallFrame, OutdoorZone } from '../types'
 import { CAR_COLORS, MAT, paint, unitBox } from './assets'
 import { Car, type CarHandle } from './Car'
@@ -10,19 +10,24 @@ import { Instanced } from './Hall'
 import { makePath, mod, placeOnPath, type P3 } from './motion'
 import { pickModel } from './carModels'
 import { ParkedCars, type ParkedCar } from './ParkedCars'
+import { surfaceTile } from './surfaces'
 
 type Item = { p: [number, number, number]; s: [number, number, number]; r?: number }
 
 const CONTAINER_COLORS = ['#1f5fae', '#c0392b', '#e67e22', '#7f8c8d', '#27ae60', '#f1f2f4', '#8e2b2b']
 const containerMats = CONTAINER_COLORS.map((c) => paint(c, 0.35, 0.6))
 const coneMat = paint('#ff6a00', 0, 0.6)
-const concrete = paint('#8e908c', 0, 0.95)
-const asphalt = paint('#5a5e62', 0, 0.9)
+// The satellite and paving are only 9 cm apart. Explicit depth offsets keep
+// the paving above the image even when zoomed out, without lifting vehicles.
+const pavingDepth = { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }
+const concrete = new MeshStandardMaterial({ color: '#8e908c', roughness: 0.95, map: surfaceTile('concrete', 12), ...pavingDepth })
+const asphalt = new MeshStandardMaterial({ color: '#5a5e62', roughness: 0.9, map: surfaceTile('asphalt', 45), ...pavingDepth })
+const parkingMarkMat = new MeshStandardMaterial({ color: '#d8d7c8', roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })
 
 /** Покрытие площадки: закрывает плоские объекты спутникового снимка под 3D-моделями. */
 function Pad({ zone, material }: { zone: OutdoorZone; material: typeof asphalt }) {
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} material={material} receiveShadow>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} material={material} renderOrder={1} receiveShadow>
       <planeGeometry args={zone.size} />
     </mesh>
   )
@@ -90,7 +95,15 @@ function FinishedLot({ zone }: { zone: OutdoorZone }) {
     }
     return out
   }, [zone])
-  return <ParkedCars cars={cars} />
+  const marks = useMemo<Item[]>(() => {
+    const out: Item[] = []
+    const [L, W] = zone.size
+    for (let z = -W / 2 + 6; z < W / 2 - 4; z += 13)
+      for (let x = -L / 2 + 2.65; x < L / 2 - 4; x += 2.7)
+        for (const side of [-2.6, 2.6]) out.push({ p: [x, 0.07, z + side], s: [0.1, 0.025, 5] })
+    return out
+  }, [zone])
+  return <><ParkedCars cars={cars} /><Instanced geometry={unitBox} material={parkingMarkMat} items={marks} /></>
 }
 
 function TestTrack({ zone }: { zone: OutdoorZone }) {
@@ -123,7 +136,7 @@ function TestTrack({ zone }: { zone: OutdoorZone }) {
   const marks = useMemo(() => curve.getSpacedPoints(160).map((p) => [p.x, 0.08, p.z] as [number, number, number]), [curve])
   return (
     <group>
-      <Line points={marks} color="#f4f4f4" lineWidth={2} />
+      <Line points={marks} color="#f4f4f4" lineWidth={2} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-4} />
       <Car ref={car} model="onix" body={paint(CAR_COLORS[3])} glass={MAT.glass} wheels details />
       <Instanced geometry={unitBox} material={coneMat} items={cones} />
     </group>

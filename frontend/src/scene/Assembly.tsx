@@ -55,7 +55,7 @@ const QC_PATH: P3[] = [
 const postLine = new MeshBasicMaterial({ color: '#f2c200' })
 const tunnelLight = new MeshBasicMaterial({ color: new Color(3, 3, 3), toneMapped: false })
 const waterGlass = new MeshStandardMaterial({ color: '#7fb6e6', transparent: true, opacity: 0.25, roughness: 0.05, depthWrite: false })
-const dropMat = new MeshBasicMaterial({ color: '#d7ecff', transparent: true, opacity: 0.7 })
+const dropMat = new MeshBasicMaterial({ color: '#d7ecff', transparent: true, opacity: 0.7, depthWrite: false })
 const lift = paint('#f2a900', 0.3, 0.5)
 const rackMat = paint('#5b6b7c', 0.4, 0.55)
 

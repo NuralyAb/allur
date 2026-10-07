@@ -62,7 +62,7 @@ export const Car = forwardRef<CarHandle, Props>(function Car(
 
   return (
     <group ref={root} position={position} rotation={rotation}>
-      <mesh ref={bodyRef} geometry={geo.body} material={body} />
+      <mesh ref={bodyRef} geometry={geo.body} material={body} castShadow receiveShadow />
       <mesh ref={glassRef} geometry={geo.glass} material={glass ?? MAT.glass} visible={!!glass} />
       <mesh ref={detailsRef} geometry={geo.details} material={vertexColored} visible={details} />
       <group ref={wheelsRef} visible={wheels}>
