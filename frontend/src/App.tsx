@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { loadAll } from './api'
-import { Scene, outdoorShot, zoneShot, type Shot } from './scene/Scene'
+import { Scene, outdoorShot, overviewShot, zoneShot, type Shot } from './scene/Scene'
 import { hallToWorld } from './scene/geo'
 import { buildTour } from './scene/tour'
 import type { Kpi, OutdoorZone, Plant, Selection, Site, Zone } from './types'
@@ -8,6 +8,7 @@ import { TopBar } from './ui/TopBar'
 import { TourBar } from './ui/TourBar'
 import { ZoneList } from './ui/ZoneList'
 import { ZonePanel } from './ui/ZonePanel'
+import { AnalyticsPanel } from './ui/AnalyticsPanel'
 
 const STEP_MS = 9000
 
@@ -45,6 +46,19 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
   const [shot, setShot] = useState<Shot | null>(null)
   const [step, setStep] = useState<number | null>(null)
   const [playing, setPlaying] = useState(false)
+  const [analytics, setAnalytics] = useState(false)
+  const [navigation, setNavigation] = useState(false)
+
+  useEffect(() => {
+    if (analytics) return
+    const closePanel = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (navigation) setNavigation(false)
+      else setSelection(null)
+    }
+    window.addEventListener('keydown', closePanel)
+    return () => window.removeEventListener('keydown', closePanel)
+  }, [analytics, navigation])
 
   const findSelection = useCallback(
     (id?: string): Selection => {
@@ -60,6 +74,7 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
   const goTo = useCallback(
     (i: number) => {
       const s = tour[i]
+      setNavigation(false)
       setStep(i)
       setRoof(s.roof)
       setSelection(findSelection(s.zone))
@@ -93,12 +108,16 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
   }, [playing, step, tour.length, goTo])
 
   const selectZone = (z: Zone) => {
+    setNavigation(false)
+    setStep(null)
     setPlaying(false)
     setRoof(false)
     setSelection({ kind: 'zone', zone: z })
     setShot(zoneShot(plant, z))
   }
   const selectOutdoor = (z: OutdoorZone) => {
+    setNavigation(false)
+    setStep(null)
     setPlaying(false)
     setSelection({ kind: 'outdoor', zone: z })
     setShot(outdoorShot(z))
@@ -119,27 +138,37 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
         onSelectOutdoor={selectOutdoor}
         onUserMove={() => setPlaying(false)}
       />
-      <TopBar plant={plant} kpi={kpi} />
-      <ZoneList plant={plant} selection={selection} onZone={selectZone} onOutdoor={selectOutdoor} />
-      <ZonePanel plant={plant} kpi={kpi} selection={selection} onClose={() => setSelection(null)} />
-      <TourBar
-        stops={tour}
-        index={step}
-        playing={playing}
-        roof={roof}
-        labels={labels}
-        onPlay={() => {
-          setPlaying(true)
-          goTo(step === null || step >= tour.length - 1 ? 0 : step)
-        }}
-        onStop={() => setPlaying(false)}
-        onStep={(i) => goTo(i)}
-        onRoof={() => setRoof((r) => !r)}
-        onLabels={() => setLabels((l) => !l)}
-      />
-      <footer className="attrib">
-        Контуры зданий © OpenStreetMap contributors · Спутник: Esri World Imagery · Расстановка цехов — по карте-схеме проекта НДВ ТОО «СарыаркаАвтоПром» (2022)
-      </footer>
+      <div className="ui-shell">
+        <TopBar plant={plant} kpi={kpi} navigation={navigation} onNavigation={() => setNavigation((v) => !v)} onAnalytics={() => { setPlaying(false); setAnalytics(true) }} />
+        {analytics && <AnalyticsPanel kpi={kpi} onClose={() => setAnalytics(false)} onArea={(area) => {
+          const zone = plant.zones.find((z) => z.kpiArea === area)
+          if (zone) { setAnalytics(false); selectZone(zone) }
+        }} />}
+        <div className={`workspace${navigation ? ' navigation-open' : ''}${step !== null ? ' touring' : ''}`}>
+          <ZoneList plant={plant} selection={selection} onZone={selectZone} onOutdoor={selectOutdoor} onClose={() => setNavigation(false)} />
+          <div className="scene-space" aria-hidden="true" />
+          <ZonePanel key={selection?.zone.id} plant={plant} kpi={kpi} selection={selection} onClose={() => setSelection(null)} />
+        </div>
+        <TourBar
+          stops={tour}
+          index={step}
+          playing={playing}
+          roof={roof}
+          labels={labels}
+          onPlay={() => {
+            setPlaying(true)
+            goTo(step === null || step >= tour.length - 1 ? 0 : step)
+          }}
+          onStop={() => setPlaying(false)}
+          onStep={(i) => goTo(i)}
+          onRoof={() => setRoof((r) => !r)}
+          onLabels={() => setLabels((l) => !l)}
+          onOverview={() => { setNavigation(false); setPlaying(false); setStep(null); setSelection(null); setShot(overviewShot(plant)) }}
+        />
+        <footer className="attrib">
+          Контуры зданий © OpenStreetMap contributors · Спутник: Esri World Imagery · Расстановка цехов — по карте-схеме проекта НДВ ТОО «СарыаркаАвтоПром» (2022)
+        </footer>
+      </div>
     </div>
   )
 }

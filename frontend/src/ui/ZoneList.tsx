@@ -8,11 +8,13 @@ export function ZoneList({
   selection,
   onZone,
   onOutdoor,
+  onClose,
 }: {
   plant: Plant
   selection: Selection
   onZone: (z: Zone) => void
   onOutdoor: (z: OutdoorZone) => void
+  onClose: () => void
 }) {
   const items = FLOW.map((id) => {
     const z = plant.zones.find((x) => x.id === id)
@@ -23,16 +25,17 @@ export function ZoneList({
   }).filter((x) => x !== null)
 
   return (
-    <nav className="zonelist">
-      <div className="panel-caption">Производственный поток</div>
+    <nav className="zonelist" id="plant-navigation" aria-label="Участки завода">
+      <div className="navigation-heading"><div><span className="eyebrow">Навигация по заводу</span><h2>Участки</h2></div><button className="navigation-close icon-button" onClick={onClose} aria-label="Закрыть список участков">×</button></div>
+      <div className="panel-caption">Производственный поток · {items.length}</div>
       <ol>
         {items.map((it, i) => (
           <li key={it.id}>
-            <button className={selection?.zone.id === it.id ? 'active' : ''} onClick={it.pick}>
-              <span className="zl-num" style={{ background: it.color }}>
+            <button className={selection?.zone.id === it.id ? 'active' : ''} aria-current={selection?.zone.id === it.id ? 'location' : undefined} onClick={it.pick}>
+              <span className="zl-num" style={{ color: it.color }}>
                 {i + 1}
               </span>
-              {it.name}
+              <span className="zl-name">{it.name}</span><span className="zl-arrow" aria-hidden="true">›</span>
             </button>
           </li>
         ))}

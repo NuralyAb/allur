@@ -11,6 +11,7 @@ export function TourBar({
   onStep,
   onRoof,
   onLabels,
+  onOverview,
 }: {
   stops: TourStop[]
   index: number | null
@@ -22,6 +23,7 @@ export function TourBar({
   onStep: (i: number) => void
   onRoof: () => void
   onLabels: () => void
+  onOverview: () => void
 }) {
   const stop = index !== null ? stops[index] : null
   return (
@@ -35,12 +37,12 @@ export function TourBar({
           <div className="tour-text">{stop.text}</div>
           <div className="tour-progress">
             {stops.map((_, i) => (
-              <button key={i} className={i === index ? 'on' : i < index! ? 'done' : ''} onClick={() => onStep(i)} aria-label={`Шаг ${i + 1}`} />
+              <button key={i} className={i === index ? 'on' : i < index! ? 'done' : ''} onClick={() => onStep(i)} aria-label={`Шаг ${i + 1}`} aria-current={i === index ? 'step' : undefined} />
             ))}
           </div>
         </div>
       )}
-      <div className="controls">
+      <div className="controls" role="group" aria-label="Управление 3D-сценой">
         {index !== null && (
           <button onClick={() => onStep(Math.max(0, index - 1))} disabled={index === 0} title="Назад">
             ‹
@@ -55,6 +57,7 @@ export function TourBar({
           </button>
         )}
         <span className="sep" />
+        <button onClick={onOverview}>Общий вид</button>
         <button className={roof ? '' : 'toggled'} onClick={onRoof} title="Снять кровлю и показать цеха">
           {roof ? 'Заглянуть внутрь' : 'Показать кровлю'}
         </button>

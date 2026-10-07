@@ -2,7 +2,7 @@ import type { Kpi, Plant } from '../types'
 
 const fmtDate = (d: string) => d.split('-').reverse().join('.')
 
-export function TopBar({ plant, kpi }: { plant: Plant; kpi: Kpi }) {
+export function TopBar({ plant, kpi, navigation, onNavigation, onAnalytics }: { plant: Plant; kpi: Kpi; navigation: boolean; onNavigation: () => void; onAnalytics: () => void }) {
   const p = kpi.plant
   const t = kpi.targets
   const mp = kpi.monthPlan
@@ -14,6 +14,11 @@ export function TopBar({ plant, kpi }: { plant: Plant; kpi: Kpi }) {
           <div className="brand-title">Цифровой двойник завода</div>
           <div className="brand-sub">{plant.address}</div>
         </div>
+      </div>
+      <div className="header-actions">
+        <span className="demo-badge">Демо · {fmtDate(kpi.date)}</span>
+        <button className="navigation-toggle" aria-expanded={navigation} aria-controls="plant-navigation" onClick={onNavigation}>Участки</button>
+        <button className="analytics-launch" onClick={onAnalytics}>Данные и аналитика <span aria-hidden="true">↗</span></button>
       </div>
       <div className="kpis">
         <Metric label={`Сборка ${fmtDate(kpi.date)}`} value={`${p.fact} / ${p.plan}`} hint="факт / план, авто" status={p.fact >= p.plan ? 'ok' : 'warn'} />
