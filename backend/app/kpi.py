@@ -65,10 +65,27 @@ def line_metrics(row: dict) -> dict:
     }
 
 
+def downtime_events() -> list[dict]:
+    """Daily equipment totals, rather than comparing an area's sum to the limit."""
+    return [
+        {
+            **event,
+            "dailyMinutes": sum(d["minutes"] for d in DOWNTIME
+                                if (d["date"], d["equipment"]) == (event["date"], event["equipment"])),
+            "limit": TARGETS["downtime_critical"],
+            "overLimit": sum(d["minutes"] for d in DOWNTIME
+                             if (d["date"], d["equipment"]) == (event["date"], event["equipment"])) > TARGETS["downtime_critical"],
+        }
+        for event in DOWNTIME
+    ]
+
+
 def summary() -> dict:
     rows = [line_metrics(r) for r in LINES]
     last_date = max(r["date"] for r in rows)
     last = [r for r in rows if r["date"] == last_date]
+    assembly = next(r for r in last if r["area"] == "Сборка")
+    lowest = min(last, key=lambda r: r["fact"])
     areas = {}
     for r in rows:
         areas.setdefault(r["area"], []).append(r)
@@ -79,11 +96,34 @@ def summary() -> dict:
         "rows": rows,
         "areas": {a: sorted(v, key=lambda r: r["date"]) for a, v in areas.items()},
         "plant": {
-            "plan": max(r["plan"] for r in last),  # переделы последовательны: план завода = план линии
-            "fact": min(r["fact"] for r in last),  # выпуск завода ограничен самым медленным переделом
-            "oee": round(sum(r["oee"] for r in last) / len(last), 1),
-            "defectRate": round(sum(r["defects"] for r in last) / sum(r["fact"] for r in last) * 100, 1),
+            "basis": assembly["line"],
+            "plan": assembly["plan"],
+            "fact": assembly["fact"],
+            "good": assembly["fact"] - assembly["defects"],
+            "oee": assembly["oee"],  # conditional demo indicator, not plant-wide OEE
+            "defectRate": assembly["defectRate"],
             "downtime": sum(r["downtime"] for r in last),
         },
-        "monthPlan": {"models": MONTH_PLAN, "total": month_plan, "target": TARGETS["monthly_output"]},
+        "flowMinimum": {"area": lowest["area"], "fact": lowest["fact"]},
+        "downtimeEvents": downtime_events(),
+        "monthPlan": {"models": MONTH_PLAN, "total": month_plan, "target": TARGETS["monthly_output"],
+                      "gap": max(0, TARGETS["monthly_output"] - month_plan)},
+        "meta": {
+            "demo": True,
+            "source": "Кейс_Цифровой_двойник_Тестовые_данные.docx",
+            "shiftHours": SHIFT_HOURS,
+            "methodology": [
+                "Факт выпуска и брак в сводке относятся к Сборке-1. Данные приёмки ОТК отсутствуют.",
+                "Условный OEE = min(время работы / 8 ч, 1) × min(факт / план, 1) × доля годных. Это демонстрационная оценка: идеальный такт отсутствует.",
+                "В кейсе указаны 2 смены по 8 часов. Период строк не уточнён; только для условного OEE строка трактуется как одна смена.",
+                "Минимальный факт участка не равен выпуску завода и не доказывает наличие узкого места: остатки между участками неизвестны.",
+                "Простои — исторические события. Критичность оборудования не указана; сравнение с 60 мин/сутки условное.",
+                "Данные статичны, а движение оборудования в 3D иллюстративно. Текущего мониторинга и прогноза в этом режиме нет.",
+            ],
+            "issues": [
+                {"date": r["date"], "line": r["line"],
+                 "message": f"Работа {round(r['hours'] * 60)} мин + журнал простоев {r['downtime']} мин = {round(r['hours'] * 60) + r['downtime']} мин, больше 480 мин. Нельзя считать эти записи одной сменой без уточнения периода."}
+                for r in rows if round(r["hours"] * 60) + r["downtime"] > SHIFT_HOURS * 60
+            ],
+        },
     }

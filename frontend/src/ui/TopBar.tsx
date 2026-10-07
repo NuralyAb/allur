@@ -16,9 +16,9 @@ export function TopBar({ plant, kpi }: { plant: Plant; kpi: Kpi }) {
         </div>
       </div>
       <div className="kpis">
-        <Metric label={`Выпуск ${fmtDate(kpi.date)}`} value={`${p.fact} / ${p.plan}`} hint="факт / план, авто" status={p.fact >= p.plan ? 'ok' : 'warn'} />
-        <Metric label="OEE завода" value={`${p.oee}%`} hint={`цель ≥ ${t.oee}%`} status={p.oee >= t.oee ? 'ok' : 'bad'} />
-        <Metric label="Брак" value={`${p.defectRate}%`} hint={`норма ≤ ${t.defect}%`} status={p.defectRate <= t.defect ? 'ok' : 'bad'} />
+        <Metric label={`Сборка ${fmtDate(kpi.date)}`} value={`${p.fact} / ${p.plan}`} hint="факт / план, авто" status={p.fact >= p.plan ? 'ok' : 'warn'} />
+        <Metric label="Условный OEE сборки" value={`${p.oee}%`} hint={`демо · цель ≥ ${t.oee}%`} status={p.oee >= t.oee ? 'ok' : 'bad'} />
+        <Metric label="Брак сборки" value={`${p.defectRate}%`} hint={`норма ≤ ${t.defect}%`} status={p.defectRate <= t.defect ? 'ok' : 'bad'} />
         <Metric label="Простои" value={`${p.downtime} мин`} hint="за сутки, все участки" status="neutral" />
         <Metric
           label="План месяца"

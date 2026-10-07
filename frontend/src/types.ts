@@ -77,8 +77,11 @@ export interface Kpi {
   date: string
   rows: LineRow[]
   areas: Record<string, LineRow[]>
-  plant: { plan: number; fact: number; oee: number; defectRate: number; downtime: number }
-  monthPlan: { models: { model: string; plan: number }[]; total: number; target: number }
+  plant: { basis: string; plan: number; fact: number; good: number; oee: number; defectRate: number; downtime: number }
+  flowMinimum: { area: string; fact: number }
+  downtimeEvents: { date: string; area: string; equipment: string; reason: string; minutes: number; dailyMinutes: number; limit: number; overLimit: boolean }[]
+  monthPlan: { models: { model: string; plan: number }[]; total: number; target: number; gap: number }
+  meta: { demo: boolean; source: string; shiftHours: number; methodology: string[]; issues: { date: string; line: string; message: string }[] }
 }
 
 /** Выбранный объект: зона корпуса или открытая площадка. */
