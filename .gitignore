@@ -6,3 +6,5 @@ __pycache__/
 .env
 .vite/
 visual-audit/
+test-results/
+playwright-report/

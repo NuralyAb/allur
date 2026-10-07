@@ -49,7 +49,7 @@ export function TourBar({
           </button>
         )}
         <button className="primary" onClick={playing ? onStop : onPlay}>
-          {playing ? '❚❚ Пауза' : index === null ? '▶ 3D-экскурсия' : '▶ Продолжить'}
+          {playing ? '❚❚ Пауза экскурсии' : index === null ? '▶ 3D-экскурсия' : '▶ Продолжить'}
         </button>
         {index !== null && (
           <button onClick={() => onStep(Math.min(stops.length - 1, index + 1))} disabled={index === stops.length - 1} title="Вперёд">
@@ -58,10 +58,10 @@ export function TourBar({
         )}
         <span className="sep" />
         <button onClick={onOverview}>Общий вид</button>
-        <button className={roof ? '' : 'toggled'} onClick={onRoof} title="Снять кровлю и показать цеха">
+        <button className={roof ? '' : 'toggled'} aria-pressed={!roof} onClick={onRoof} title="Снять кровлю и показать цеха">
           {roof ? 'Заглянуть внутрь' : 'Показать кровлю'}
         </button>
-        <button className={labels ? 'toggled' : ''} onClick={onLabels}>
+        <button className={labels ? 'toggled' : ''} aria-pressed={labels} onClick={onLabels}>
           Подписи
         </button>
       </div>

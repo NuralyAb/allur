@@ -1,5 +1,5 @@
+import { useProductionFrame, useProductionEnabled, StageScope } from '../simulation/ProductionClock'
 import { Text } from '@react-three/drei'
-import { useFrame } from '@react-three/fiber'
 import { Suspense, useMemo, useRef } from 'react'
 import { Color, InstancedMesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, type Group, type Mesh } from 'three'
 import { CAR_COLORS, MAT, paint, unitBox, unitCyl } from './assets'
@@ -27,7 +27,7 @@ const UB = 200
 const POST = (UB - UA) / 20 // 6.4 м
 const SPEED = 0.42
 
-const ASM_PATH: P3[] = [
+export const ASM_PATH: P3[] = [
   [UA - 4, 0.35, -LANES[0]],
   [UB, 0.35, -LANES[0]],
   [UB + 3, 1.0, -(LANES[0] + LANES[1]) / 2],
@@ -38,7 +38,7 @@ const ASM_PATH: P3[] = [
   [UB + 2, 0.35, -LANES[2]],
 ]
 
-const QC_PATH: P3[] = [
+export const QC_PATH: P3[] = [
   [UB + 3, 0, -LANES[2]],
   [206, 0, -86],
   [206, 0, -72],
@@ -67,7 +67,7 @@ function AssemblyCars() {
   const cars = useRef<(CarHandle | null)[]>([])
   const hangers = useRef<(Group | null)[]>([])
 
-  useFrame(({ clock }) => {
+  useProductionFrame(({ clock }) => {
     const t = clock.elapsedTime
     cars.current.forEach((c, i) => {
       if (!c) return
@@ -105,7 +105,7 @@ function HangerFollowers({
   hangers: React.RefObject<(Group | null)[]>
   count: number
 }) {
-  useFrame(() => {
+  useProductionFrame(() => {
     hangers.current.forEach((h, i) => {
       const c = cars.current[i]
       if (!h || !c) return
@@ -135,7 +135,7 @@ function QcCars() {
   const spacing = 13
   const count = Math.floor(length / spacing)
   const cars = useRef<(CarHandle | null)[]>([])
-  useFrame(({ clock }) => {
+  useProductionFrame(({ clock }) => {
     const t = clock.elapsedTime
     cars.current.forEach((c, i) => {
       if (!c) return
@@ -165,7 +165,7 @@ function Rain() {
   const N = 260
   const seeds = useMemo(() => Array.from({ length: N }, () => [Math.random() * 24 - 12, Math.random() * 7 - 3.5, Math.random()]), [])
   const o = useMemo(() => new Object3D(), [])
-  useFrame(({ clock }) => {
+  useProductionFrame(({ clock }) => {
     seeds.forEach(([x, z, s], i) => {
       o.position.set(x, 4.2 - ((clock.elapsedTime * 1.6 + s) % 1) * 4.2, z)
       o.scale.set(0.03, 0.35, 0.03)
@@ -179,7 +179,7 @@ function Rain() {
 
 function Rollers() {
   const ref = useRef<Group>(null!)
-  useFrame(() => ref.current.children.forEach((m) => ((m as Mesh).rotation.x += 0.25)))
+  useProductionFrame(() => ref.current.children.forEach((m) => ((m as Mesh).rotation.x += 0.25)))
   return (
     <group ref={ref}>
       {[-1.35, 1.35].flatMap((x) =>
@@ -291,6 +291,7 @@ function LineFurniture() {
       <Suspense fallback={null}>
         {posts.map((p) => (
           <Text
+            font="/fonts/Manrope.ttf"
             key={p.n}
             position={[p.u, 0.07, -(p.v - 2.9)]}
             rotation={[-Math.PI / 2, 0, 0]}
@@ -346,7 +347,7 @@ function LineFurniture() {
 
 function Marriage() {
   const ref = useRef<Group>(null!)
-  useFrame(({ clock }) => {
+  useProductionFrame(({ clock }) => {
     ref.current.position.y = 0.1 + Math.max(0, Math.sin(clock.elapsedTime * 0.5)) * 0.5
   })
   return (
@@ -361,12 +362,13 @@ function Marriage() {
 }
 
 export function Assembly() {
+  const simulated = useProductionEnabled()
   return (
     <group>
       <LineFurniture />
-      <AssemblyCars />
-      <QcStations />
-      <QcCars />
+      {!simulated && <AssemblyCars />}
+      <StageScope stage="qc"><QcStations /></StageScope>
+      {!simulated && <QcCars />}
     </group>
   )
 }

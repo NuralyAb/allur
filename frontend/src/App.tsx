@@ -9,6 +9,9 @@ import { TourBar } from './ui/TourBar'
 import { ZoneList } from './ui/ZoneList'
 import { ZonePanel } from './ui/ZonePanel'
 import { AnalyticsPanel } from './ui/AnalyticsPanel'
+import { useSimulation } from './simulation/useSimulation'
+import { SimulationPanel, SimulationTransport } from './ui/SimulationPanel'
+import type { Stage } from './simulation/types'
 
 const STEP_MS = 9000
 
@@ -48,17 +51,21 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
   const [playing, setPlaying] = useState(false)
   const [analytics, setAnalytics] = useState(false)
   const [navigation, setNavigation] = useState(false)
+  const [simulationMode, setSimulationMode] = useState(false)
+  const [simulationPanel, setSimulationPanel] = useState(true)
+  const simulation = useSimulation(simulationMode)
 
   useEffect(() => {
     if (analytics) return
     const closePanel = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      if (simulationMode) { setSimulationPanel(false); return }
       if (navigation) setNavigation(false)
       else setSelection(null)
     }
     window.addEventListener('keydown', closePanel)
     return () => window.removeEventListener('keydown', closePanel)
-  }, [analytics, navigation])
+  }, [analytics, navigation, simulationMode])
 
   const findSelection = useCallback(
     (id?: string): Selection => {
@@ -74,6 +81,7 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
   const goTo = useCallback(
     (i: number) => {
       const s = tour[i]
+      if (!s || !Number.isInteger(i)) return
       setNavigation(false)
       setStep(i)
       setRoof(s.roof)
@@ -88,7 +96,7 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
     const n = Number(q.get('step'))
-    if (n >= 1 && n <= tour.length) goTo(n - 1)
+    if (Number.isInteger(n) && n >= 1 && n <= tour.length) goTo(n - 1)
     const cam = q.get('cam')?.split(',').map(Number)
     if (cam?.length === 6 && cam.every(Number.isFinite)) {
       setRoof(q.get('roof') === '1')
@@ -116,11 +124,32 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
     setShot(zoneShot(plant, z))
   }
   const selectOutdoor = (z: OutdoorZone) => {
+    setRoof(true)
     setNavigation(false)
     setStep(null)
     setPlaying(false)
     setSelection({ kind: 'outdoor', zone: z })
     setShot(outdoorShot(z))
+  }
+
+  const selectAsset = (stage: Stage) => {
+    setRoof(false); setPlaying(false); setStep(null)
+    const [u, v] = stage.position
+    setShot(stage.stage === 'assembly'
+      ? { camera: hallToWorld(plant.hall, 100, -130, 210), target: hallToWorld(plant.hall, 210, 95, 0) }
+      : { camera: hallToWorld(plant.hall, u - 35, v - 50, 42), target: hallToWorld(plant.hall, u, v, 2) })
+  }
+  const toggleSimulation = async () => {
+    if (simulation.busy) return
+    if (simulationMode) {
+      await simulation.control('pause')
+      setSimulationMode(false); setShot(overviewShot(plant)); setRoof(true)
+    } else {
+      setPlaying(false); setStep(null); setSelection(null); setNavigation(false)
+      setSimulationPanel(true); setSimulationMode(true); setRoof(false)
+      const area = plant.zones.find((z) => z.id === 'assembly')!
+      setShot(zoneShot(plant, area))
+    }
   }
 
   return (
@@ -134,22 +163,24 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
         shot={shot}
         mood="sunset"
         detailed={true}
+        simulation={simulationMode ? simulation.snapshot : null}
+        onSelectAsset={selectAsset}
         onSelectZone={selectZone}
         onSelectOutdoor={selectOutdoor}
         onUserMove={() => setPlaying(false)}
       />
       <div className="ui-shell">
-        <TopBar plant={plant} kpi={kpi} navigation={navigation} onNavigation={() => setNavigation((v) => !v)} onAnalytics={() => { setPlaying(false); setAnalytics(true) }} />
+        <TopBar plant={plant} kpi={kpi} navigation={navigation} onNavigation={() => setNavigation((v) => !v)} onAnalytics={() => { setPlaying(false); if (simulationMode) void simulation.control('pause'); setAnalytics(true) }} simulationMode={simulationMode} simulation={simulation.snapshot} connected={simulation.connected} busy={simulation.busy} onSimulation={() => void toggleSimulation()} />
         {analytics && <AnalyticsPanel kpi={kpi} onClose={() => setAnalytics(false)} onArea={(area) => {
           const zone = plant.zones.find((z) => z.kpiArea === area)
-          if (zone) { setAnalytics(false); selectZone(zone) }
+          if (zone) { setAnalytics(false); setSimulationMode(false); selectZone(zone) }
         }} />}
-        <div className={`workspace${navigation ? ' navigation-open' : ''}${step !== null ? ' touring' : ''}`}>
-          <ZoneList plant={plant} selection={selection} onZone={selectZone} onOutdoor={selectOutdoor} onClose={() => setNavigation(false)} />
+        <div className={`workspace${simulationMode ? ' simulation-workspace' : ''}${navigation ? ' navigation-open' : ''}${step !== null ? ' touring' : ''}`}>
+          {!simulationMode && <ZoneList plant={plant} selection={selection} onZone={selectZone} onOutdoor={selectOutdoor} onClose={() => setNavigation(false)} />}
           <div className="scene-space" aria-hidden="true" />
-          <ZonePanel key={selection?.zone.id} plant={plant} kpi={kpi} selection={selection} onClose={() => setSelection(null)} />
+          {simulationMode ? simulationPanel && <SimulationPanel simulation={simulation} onAsset={selectAsset} onHide={() => setSimulationPanel(false)} /> : <ZonePanel key={selection?.zone.id} plant={plant} kpi={kpi} selection={selection} onClose={() => setSelection(null)} />}
         </div>
-        <TourBar
+        {simulationMode ? <SimulationTransport simulation={simulation} panel={simulationPanel} onPanel={() => setSimulationPanel((v) => !v)} roof={roof} onRoof={() => setRoof((v) => !v)} onOverview={() => { setShot(overviewShot(plant)); setRoof(true) }} /> : <TourBar
           stops={tour}
           index={step}
           playing={playing}
@@ -164,7 +195,7 @@ function Twin({ plant, site, kpi }: { plant: Plant; site: Site; kpi: Kpi }) {
           onRoof={() => setRoof((r) => !r)}
           onLabels={() => setLabels((l) => !l)}
           onOverview={() => { setNavigation(false); setPlaying(false); setStep(null); setSelection(null); setShot(overviewShot(plant)) }}
-        />
+        />}
         <footer className="attrib">
           Контуры зданий © OpenStreetMap contributors · Спутник: Esri World Imagery · Расстановка цехов — по карте-схеме проекта НДВ ТОО «СарыаркаАвтоПром» (2022)
         </footer>

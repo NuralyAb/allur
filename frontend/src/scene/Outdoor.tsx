@@ -1,3 +1,4 @@
+import { useProductionEnabled } from '../simulation/ProductionClock'
 import { Line } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
@@ -107,6 +108,7 @@ function FinishedLot({ zone }: { zone: OutdoorZone }) {
 }
 
 function TestTrack({ zone }: { zone: OutdoorZone }) {
+  const simulated = useProductionEnabled()
   const [L, W] = zone.size
   // восьмёрка
   const curve = useMemo(() => {
@@ -137,7 +139,7 @@ function TestTrack({ zone }: { zone: OutdoorZone }) {
   return (
     <group>
       <Line points={marks} color="#f4f4f4" lineWidth={2} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-4} />
-      <Car ref={car} model="onix" body={paint(CAR_COLORS[3])} glass={MAT.glass} wheels details />
+      {!simulated && <Car ref={car} model="onix" body={paint(CAR_COLORS[3])} glass={MAT.glass} wheels details />}
       <Instanced geometry={unitBox} material={coneMat} items={cones} />
     </group>
   )
@@ -198,6 +200,7 @@ function ReachStacker({ zone }: { zone: OutdoorZone }) {
 }
 
 export function Outdoor({ frame, zones }: { frame: HallFrame; zones: OutdoorZone[] }) {
+  const simulated = useProductionEnabled()
   const z = (id: string) => zones.find((o) => o.id === id)
   const containers = z('containers')
   const finished = z('finished')
@@ -214,7 +217,7 @@ export function Outdoor({ frame, zones }: { frame: HallFrame; zones: OutdoorZone
       {finished && (
         <Aligned zone={finished} angle={frame.angle}>
           <Pad zone={finished} material={asphalt} />
-          <FinishedLot zone={finished} />
+          {!simulated && <FinishedLot zone={finished} />}
         </Aligned>
       )}
       {track && (
@@ -223,7 +226,7 @@ export function Outdoor({ frame, zones }: { frame: HallFrame; zones: OutdoorZone
           <TestTrack zone={track} />
         </Aligned>
       )}
-      <Outbound frame={frame} />
+      {!simulated && <Outbound frame={frame} />}
     </group>
   )
 }

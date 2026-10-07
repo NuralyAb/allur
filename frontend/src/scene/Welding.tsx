@@ -1,4 +1,4 @@
-import { useFrame } from '@react-three/fiber'
+import { useProductionFrame, useProductionEnabled } from '../simulation/ProductionClock'
 import { useMemo, useRef } from 'react'
 import { Color, MeshBasicMaterial, MeshStandardMaterial, type Mesh } from 'three'
 import { MAT, unitBox } from './assets'
@@ -35,11 +35,12 @@ const laserWindow = new MeshBasicMaterial({ color: new Color(1.1, 0.12, 0.08), t
 const scanMat = new MeshBasicMaterial({ color: new Color(0.2, 3, 0.6), toneMapped: false })
 
 function Line({ index, v, model, note, car }: { index: number; v: number; model: string; note: string; car: CarModelId | null }) {
+  const simulated = useProductionEnabled()
   const offset = index * 2.1
   const cars = useRef<(CarHandle | null)[]>([])
   const laser = index === 0
 
-  useFrame(({ clock }) => {
+  useProductionFrame(({ clock }) => {
     const step = indexed(clock.elapsedTime + offset, PERIOD, MOVE)
     cars.current.forEach((c, i) => {
       if (!c) return
@@ -89,7 +90,7 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
       <Instanced geometry={unitBox} material={fenceMat} items={fence} />
       <Instanced geometry={unitBox} material={MAT.yellow} items={posts} />
 
-      {Array.from({ length: SLOTS }, (_, i) => (
+      {!simulated && Array.from({ length: SLOTS }, (_, i) => (
         <Car key={i} ref={(c) => void (cars.current[i] = c)} model={car ?? pickModel(i)} />
       ))}
 
@@ -139,7 +140,7 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
 
 function Scanner() {
   const ref = useRef<Mesh>(null!)
-  useFrame(({ clock }) => {
+  useProductionFrame(({ clock }) => {
     ref.current.position.y = 1.9 + Math.sin(clock.elapsedTime * 2.2) * 0.9
   })
   return <mesh ref={ref} geometry={unitBox} material={scanMat} scale={[0.04, 0.04, 4.8]} />

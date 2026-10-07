@@ -1,4 +1,4 @@
-import { useFrame } from '@react-three/fiber'
+import { useProductionFrame, useProductionEnabled } from '../simulation/ProductionClock'
 import { useMemo, useRef } from 'react'
 import { Color, MeshBasicMaterial, MeshStandardMaterial } from 'three'
 import { CAR_COLORS, MAT, paint, unitBox } from './assets'
@@ -33,7 +33,7 @@ const V4 = 164
 const SPACING = 7.5
 const SPEED = 0.9 // м/с
 
-const PATH: P3[] = [
+export const PATH: P3[] = [
   [160, 2.6, -V1],
   [264, 2.6, -V1],
   [264, 0.55, -V2],
@@ -72,7 +72,7 @@ function Bodies() {
   const count = Math.floor(length / SPACING)
   const cars = useRef<(CarHandle | null)[]>([])
 
-  useFrame(({ clock }) => {
+  useProductionFrame(({ clock }) => {
     const t = clock.elapsedTime
     cars.current.forEach((c, i) => {
       if (!c) return
@@ -217,6 +217,7 @@ function Enclosure() {
 
 /** Перевод собственной системы цеха в корпус: a → v = a − 66, проход p → u = 470 − p. */
 export function Paint() {
+  const simulated = useProductionEnabled()
   return (
     <group position={[470, 0, 66]} rotation={[0, Math.PI / 2, 0]}>
       <Enclosure />
@@ -236,7 +237,7 @@ export function Paint() {
       <Booth u0={PRIMER[0]} u1={PRIMER[1]} label="Кабина грунта" robotsPerSide={2} />
       <Booth u0={BASE[0]} u1={BASE[1]} label="Кабина базовой эмали" robotsPerSide={3} />
       <Booth u0={CLEAR[0]} u1={CLEAR[1]} label="Кабина лака" robotsPerSide={2} />
-      <Bodies />
+      {!simulated && <Bodies />}
     </group>
   )
 }
