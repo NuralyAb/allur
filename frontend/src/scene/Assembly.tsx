@@ -5,6 +5,9 @@ import { Color, InstancedMesh, MeshBasicMaterial, MeshStandardMaterial, Object3D
 import { CAR_COLORS, MAT, paint, unitBox, unitCyl } from './assets'
 import { Car, type CarHandle } from './Car'
 import { pickModel } from './carModels'
+import { FinishedCar } from './FinishedCar'
+import { useGlbAssets } from './glbAssets'
+import { OptionalGlb } from './OptionalGlb'
 import { Instanced } from './Hall'
 import { Label } from './Label'
 import { makePath, mod, placeOnPath, type P3 } from './motion'
@@ -129,31 +132,31 @@ function HangerFollowers({
 }
 
 /** ОТК: готовые машины проходят испытательные посты. */
-function QcCars() {
+function QcCars({ detailed }: { detailed: boolean }) {
+  const assets = useGlbAssets()
   const path = useMemo(() => makePath(QC_PATH, 4), [])
   const length = useMemo(() => path.getLength(), [path])
   const spacing = 13
   const count = Math.floor(length / spacing)
-  const cars = useRef<(CarHandle | null)[]>([])
+  const cars = useRef<(Group | null)[]>([])
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     cars.current.forEach((c, i) => {
       if (!c) return
-      placeOnPath(path, length, mod(t * 1.1 + i * spacing, count * spacing), c.root)
-      c.wheels.children.forEach((w) => (w.rotation.z -= 0.08))
+      placeOnPath(path, length, mod(t * 1.1 + i * spacing, count * spacing), c)
     })
   })
   return (
     <group>
       {Array.from({ length: count }, (_, i) => (
-        <Car
+        <FinishedCar
           key={i}
           ref={(c) => void (cars.current[i] = c)}
           model={pickModel(i + 3)}
           body={paint(CAR_COLORS[(i * 2) % 5])}
-          glass={MAT.glass}
-          wheels
-          details
+          // First stage: one finished Onix in QC, never replace other car models.
+          spec={i === 1 ? assets.cars.onix : null}
+          detailed={detailed}
         />
       ))}
     </group>
@@ -253,7 +256,11 @@ function QcStations() {
 }
 
 /** Разметка постов, слэт-конвейер, стеллажи комплектации вдоль линии, рабочие. */
-function LineFurniture() {
+function LineFurniture({ detailed }: { detailed: boolean }) {
+  const assets = useGlbAssets()
+  const conveyor = assets.conveyor && assets.conveyor.length <= POST * 2 ? assets.conveyor : null
+  const sectionLength = conveyor?.length ?? POST
+  const sectionX = UA + 10.5 * POST
   const { racks, slats, marks } = useMemo(() => {
     const racks: { p: [number, number, number]; s: [number, number, number] }[] = []
     const marks: { p: [number, number, number]; s: [number, number, number] }[] = []
@@ -267,9 +274,18 @@ function LineFurniture() {
         }
       }
     })
-    const slats = [LANES[0], LANES[2]].map((v) => ({ p: [(UA + UB) / 2, 0.15, -v] as [number, number, number], s: [UB - UA + 6, 0.3, 3.2] as [number, number, number] }))
+    // Leave a separate slot in lane C so the GLB never overlaps a solid belt.
+    const start = UA - 3
+    const end = UB + 3
+    const left = sectionX - sectionLength / 2
+    const right = sectionX + sectionLength / 2
+    const slats = [
+      { p: [(UA + UB) / 2, 0.15, -LANES[0]] as [number, number, number], s: [end - start, 0.3, 3.2] as [number, number, number] },
+      { p: [(start + left) / 2, 0.15, -LANES[2]] as [number, number, number], s: [left - start, 0.3, 3.2] as [number, number, number] },
+      { p: [(right + end) / 2, 0.15, -LANES[2]] as [number, number, number], s: [end - right, 0.3, 3.2] as [number, number, number] },
+    ]
     return { racks, slats, marks }
-  }, [])
+  }, [sectionLength, sectionX])
 
   const posts = useMemo(() => {
     const out: { n: number; u: number; v: number }[] = []
@@ -284,6 +300,11 @@ function LineFurniture() {
     <group>
       <Instanced geometry={unitBox} material={rackMat} items={racks} />
       <Instanced geometry={unitBox} material={MAT.darkSteel} items={slats} />
+      <group position={[sectionX, 0, -LANES[2]]}>
+        <OptionalGlb spec={conveyor} enabled={detailed} conveyor>
+          <mesh geometry={unitBox} material={MAT.darkSteel} scale={[sectionLength, 0.3, 3.2]} position={[0, 0.15, 0]} />
+        </OptionalGlb>
+      </group>
       <Instanced geometry={unitBox} material={postLine} items={marks} />
       {/* балка подвесного конвейера ветки B */}
       <mesh geometry={unitBox} material={MAT.darkSteel} scale={[UB - UA + 8, 0.5, 0.4]} position={[(UA + UB) / 2, 6.6, -LANES[1]]} />
@@ -360,13 +381,13 @@ function Marriage() {
   )
 }
 
-export function Assembly() {
+export function Assembly({ detailed = true }: { detailed?: boolean }) {
   return (
     <group>
-      <LineFurniture />
+      <LineFurniture detailed={detailed} />
       <AssemblyCars />
       <QcStations />
-      <QcCars />
+      <QcCars detailed={detailed} />
     </group>
   )
 }

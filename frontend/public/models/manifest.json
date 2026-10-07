@@ -1,0 +1,9 @@
+{
+  "_comment": "Exact Chevrolet Onix, Chevrolet Cobalt, JAC J7 and Allur conveyor GLB assets have not been supplied yet. Null entries keep the existing scene. Add only verified models with source, author and license metadata.",
+  "cars": {
+    "onix": null,
+    "cobalt": null,
+    "j7": null
+  },
+  "conveyor": null
+}

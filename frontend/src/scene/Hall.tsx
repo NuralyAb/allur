@@ -15,13 +15,15 @@ import type { HallFrame, XY } from '../types'
 import { MAT, unitBox } from './assets'
 import { surfaceTile } from './surfaces'
 
-const glassWall = new MeshStandardMaterial({ color: '#9fb6c8', metalness: 0.2, roughness: 0.1, transparent: true, opacity: 0.35, depthWrite: false })
-const skylight = new MeshStandardMaterial({ color: '#9ea7af', roughness: 0.4, metalness: 0.2 })
-const epoxy = new MeshStandardMaterial({ color: '#a5afb4', map: surfaceTile('concrete', 1 / 12), roughness: 0.48, metalness: 0.12 })
-const roofFinish = new MeshStandardMaterial({ color: '#687580', map: surfaceTile('roof', 1 / 10), roughness: 0.48, metalness: 0.5 })
-const trim = new MeshStandardMaterial({ color: '#354854', roughness: 0.4, metalness: 0.6 })
-const panelRib = new MeshStandardMaterial({ color: '#a3b1b9', roughness: 0.55, metalness: 0.3 })
-const led = new MeshStandardMaterial({ color: '#f0f8ff', emissive: '#d8eaff', emissiveIntensity: 2.2, toneMapped: false })
+const glassWall = new MeshStandardMaterial({ color: '#859da9', metalness: 0.15, roughness: 0.18, transparent: true, opacity: 0.48, depthWrite: false })
+const skylight = new MeshStandardMaterial({ color: '#c2cbd0', roughness: 0.32, metalness: 0.12 })
+const concreteTexture = surfaceTile('concrete', 1 / 12)
+const roofTexture = surfaceTile('roof', 1 / 10)
+const epoxy = new MeshStandardMaterial({ color: '#b5bdbd', map: concreteTexture, bumpMap: concreteTexture, bumpScale: 0.025, roughness: 0.64, metalness: 0.04 })
+const roofFinish = new MeshStandardMaterial({ color: '#7c8b94', map: roofTexture, bumpMap: roofTexture, bumpScale: 0.055, roughness: 0.6, metalness: 0.32 })
+const trim = new MeshStandardMaterial({ color: '#42525c', roughness: 0.52, metalness: 0.45 })
+const panelRib = new MeshStandardMaterial({ color: '#afb9bd', roughness: 0.68, metalness: 0.18 })
+const led = new MeshStandardMaterial({ color: '#f5f8fa', emissive: '#e7f0f7', emissiveIntensity: 1.7, toneMapped: false })
 
 function FactorySign() {
   const texture = useMemo(() => {
@@ -29,9 +31,9 @@ function FactorySign() {
     canvas.width = 1024
     canvas.height = 256
     const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = '#263b49'
+    ctx.fillStyle = '#26353d'
     ctx.fillRect(0, 0, 1024, 256)
-    ctx.fillStyle = '#ff4938'
+    ctx.fillStyle = '#f04b37'
     ctx.font = 'bold 172px sans-serif'
     ctx.textAlign = 'center'
     ctx.fillText('allur', 512, 179)

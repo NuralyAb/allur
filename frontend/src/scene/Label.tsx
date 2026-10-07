@@ -1,5 +1,5 @@
 import { Html } from '@react-three/drei'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useMemo, useRef, type ReactNode } from 'react'
 import { Vector3, type Group } from 'three'
 
@@ -24,6 +24,11 @@ export function Label({
   const div = useRef<HTMLDivElement>(null!)
   const wp = useMemo(() => new Vector3(), [])
   const shown = useRef(false)
+  // Html кладёт плашку в events.connected, а r3f переподключает события после загрузки. При смене контейнера
+  // Html пересоздаёт корень без содержимого, и метки, которые не перерисовываются, пропадают.
+  // Постоянный контейнер — родитель canvas — эту смену исключает.
+  const gl = useThree((s) => s.gl)
+  const portal = useMemo(() => ({ current: gl.domElement.parentNode as HTMLElement }), [gl])
 
   useFrame(({ camera }) => {
     if (!div.current) return
@@ -40,7 +45,7 @@ export function Label({
 
   return (
     <group ref={group} position={position}>
-      <Html center zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
+      <Html portal={portal} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
         <div
           ref={div}
           className={small ? 'tag tag-small' : 'tag'}

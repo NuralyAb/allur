@@ -1,6 +1,6 @@
 import { useTexture } from '@react-three/drei'
 import { useMemo } from 'react'
-import { DoubleSide, ExtrudeGeometry, MeshStandardMaterial, SRGBColorSpace, Shape } from 'three'
+import { ClampToEdgeWrapping, DataTexture, DoubleSide, ExtrudeGeometry, LinearFilter, MeshStandardMaterial, NoColorSpace, RGBAFormat, SRGBColorSpace, Shape } from 'three'
 import type { Site, XY } from '../types'
 import { world } from './geo'
 import { surfaceTile } from './surfaces'
@@ -8,8 +8,37 @@ import { surfaceTile } from './surfaces'
 /** Границы спутниковой мозаики (Esri World Imagery, z17) в метрах площадки. */
 const SAT = { west: -624.29, east: 656.32, north: 757.78, south: -695.51 }
 
-const ctxWall = new MeshStandardMaterial({ color: '#b4c0c7', roughness: 0.8 })
-const ctxRoof = new MeshStandardMaterial({ color: '#81909b', map: surfaceTile('roof', 1 / 12), roughness: 0.65, metalness: 0.25 })
+/** Fade only the outer 140 m of the image; the plant stays fully opaque. */
+function satelliteEdgeMask() {
+  const size = 256
+  const pixels = new Uint8Array(size * size * 4)
+  const width = SAT.east - SAT.west
+  const height = SAT.north - SAT.south
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / (size - 1)
+      const v = y / (size - 1)
+      const edgeMeters = Math.min(u * width, (1 - u) * width, v * height, (1 - v) * height)
+      const t = Math.min(1, edgeMeters / 140)
+      const opacity = Math.round(t * t * (3 - 2 * t) * 255)
+      const i = (y * size + x) * 4
+      // Three.js samples alphaMap's green channel, not its alpha channel.
+      pixels[i] = pixels[i + 1] = pixels[i + 2] = opacity
+      pixels[i + 3] = 255
+    }
+  }
+  const mask = new DataTexture(pixels, size, size, RGBAFormat)
+  mask.colorSpace = NoColorSpace
+  mask.wrapS = mask.wrapT = ClampToEdgeWrapping
+  mask.minFilter = mask.magFilter = LinearFilter
+  mask.needsUpdate = true
+  return mask
+}
+
+const satEdgeMask = satelliteEdgeMask()
+
+const ctxWall = new MeshStandardMaterial({ color: '#bbc3c4', roughness: 0.85 })
+const ctxRoof = new MeshStandardMaterial({ color: '#899599', map: surfaceTile('roof', 1 / 12), roughness: 0.72, metalness: 0.18 })
 const contextMaterials = [ctxRoof, ctxWall]
 
 function shapeOf(poly: XY[]) {
@@ -61,12 +90,12 @@ export function Ground({ site, hallAngle }: { site: Site; hallAngle: number }) {
       {/* подложка за пределами снимка */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.6, 0]} receiveShadow>
         <planeGeometry args={[9000, 9000]} />
-        <meshStandardMaterial color="#6f6c58" roughness={1} />
+        <meshStandardMaterial color="#a5ac9f" roughness={1} />
       </mesh>
       {/* спутниковый снимок */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[c.x, -0.05, c.z]} receiveShadow>
         <planeGeometry args={[w, h]} />
-        <meshStandardMaterial map={sat} roughness={1} />
+        <meshStandardMaterial map={sat} alphaMap={satEdgeMask} transparent depthWrite={false} roughness={1} />
       </mesh>
 
       {/* соседние здания из OpenStreetMap */}
@@ -86,7 +115,7 @@ export function Ground({ site, hallAngle }: { site: Site; hallAngle: number }) {
             ) : (
               <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
                 <cylinderGeometry args={[e.wid / 2, e.wid / 2, e.len, 24, 1, false, 0, Math.PI]} />
-                <meshStandardMaterial color={e.color} metalness={0.5} roughness={0.45} side={DoubleSide} />
+                <meshStandardMaterial color={e.color} metalness={0.32} roughness={0.62} side={DoubleSide} />
               </mesh>
             )}
           </group>

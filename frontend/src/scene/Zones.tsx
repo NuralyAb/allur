@@ -1,17 +1,34 @@
 import { Line } from '@react-three/drei'
 import { useMemo } from 'react'
-import type { HallFrame, OutdoorZone, Selection, Zone } from '../types'
+import type { Alert, HallFrame, Level, OutdoorZone, Selection, Zone } from '../types'
 import { world } from './geo'
 import { Label } from './Label'
 
 /** Подсветка зон на полу корпуса + кликабельные подписи. Рисуется внутри группы корпуса. */
+const STATUS_COLOR = { bad: '#ff5d52', warn: '#e9be70', ok: '#69d7ac' }
+
+/** Короткая надпись для метки на модели: самое важное отклонение участка. */
+function alertTag(area: string, alerts: Alert[]) {
+  const own = alerts.filter((a) => a.area === area)
+  const live = own.find((a) => a.kind === 'live')
+  if (live) return live.title
+  if (own.some((a) => a.kind === 'bottleneck')) return 'Узкое место'
+  const q = own.find((a) => a.kind === 'quality')
+  if (q) return q.title.replace(/ при норме.*/, '')
+  return own[0]?.title
+}
+
 export function HallZones({
   zones,
+  status,
+  alerts,
   selection,
   onSelect,
   labels,
 }: {
   zones: Zone[]
+  status: Record<string, Level>
+  alerts: Alert[]
   selection: Selection
   onSelect: (z: Zone) => void
   labels: boolean
@@ -21,6 +38,8 @@ export function HallZones({
       {zones.map((z) => {
         const [u0, u1, v0, v1] = z.rect
         const active = selection?.kind === 'zone' && selection.zone.id === z.id
+        const level = z.kpiArea ? status[z.kpiArea] : undefined
+        const tag = z.kpiArea && level && level !== 'ok' ? alertTag(z.kpiArea, alerts) : undefined
         return (
           <group key={z.id}>
             <mesh
@@ -42,12 +61,19 @@ export function HallZones({
                 [u0, 0.08, -v1],
                 [u0, 0.08, -v0],
               ]}
-              color={z.color}
-              lineWidth={active ? 3 : 1.5}
+              color={tag ? STATUS_COLOR[level!] : z.color}
+              lineWidth={active ? 2.5 : tag ? 1.7 : 0.8}
+              transparent
+              opacity={active || tag ? 0.9 : 0.4}
               polygonOffset
               polygonOffsetFactor={-2}
               polygonOffsetUnits={-4}
             />
+            {tag && (labels || active || tag === 'Узкое место' || tag.startsWith('Простой')) && (
+              <Label position={[(u0 + u1) / 2, labels ? 26 : 17, -(v0 + v1) / 2]} color={STATUS_COLOR[level!]} onClick={() => onSelect(z)}>
+                {z.short}: {tag}
+              </Label>
+            )}
             {labels && (
               <Label position={[(u0 + u1) / 2, 17, -(v0 + v1) / 2]} color={z.color} onClick={() => onSelect(z)}>
                 {z.short}

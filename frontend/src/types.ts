@@ -86,3 +86,97 @@ export interface Kpi {
 
 /** Выбранный объект: зона корпуса или открытая площадка. */
 export type Selection = { kind: 'zone'; zone: Zone } | { kind: 'outdoor'; zone: OutdoorZone } | null
+
+export type Level = 'bad' | 'warn' | 'ok'
+
+export interface ScenarioResult {
+  levers: string[]
+  shifts: number
+  days: number
+  extraShifts: number
+  areas: Record<string, { output: number; good: number; defectRate: number }>
+  bottleneck: string
+  perShift: number
+  month: number
+  plan: number
+  target: number
+  vsPlan: number
+  vsTarget: number
+  extraShiftsForTarget: number
+  requiredPerShift: number
+}
+
+export interface Lever {
+  id: string
+  area: string | null
+  title: string
+  detail: string
+  /** прирост выпуска за месяц, если включить только это мероприятие */
+  effect: number
+  bottleneckAfter: string
+}
+
+export interface Alert {
+  level: Level
+  area: string | null
+  /** live — простой, который идёт прямо сейчас (из потока симулятора или линии) */
+  kind: 'bottleneck' | 'quality' | 'flow' | 'equipment' | 'plan' | 'live'
+  title: string
+  text: string
+}
+
+export interface Risk {
+  date: string
+  area: string
+  equipment: string
+  reason: string
+  minutes: number
+  dailyMinutes: number
+  limit: number
+  planned: boolean
+  shareOfLimit: number
+  onBottleneck: boolean
+  carsLost: number
+  plantCarsLost: number
+  level: 'high' | 'medium' | 'low'
+  action: string
+}
+
+export interface Insights {
+  assumptions: string[]
+  workDays: number
+  base: ScenarioResult
+  best: ScenarioResult
+  levers: Lever[]
+  risks: Risk[]
+  alerts: Alert[]
+  status: Record<string, Level>
+  flow: { area: string; plan: number; fact: number; good: number; takt: number }[]
+  lostPerMonth: number
+  nominalCapacity: number
+}
+
+export interface DataSource {
+  source: string
+  updatedAt: string | null
+  version: number
+  counts: { lines: number; downtime: number; quality: number; monthPlan: number }
+  dates: [string, string] | null
+  live: boolean
+}
+
+export interface LiveShift {
+  date: string
+  elapsed: number
+  length: number
+  areas: Record<string, { done: number; defects: number; plan: number; stopped: boolean }>
+  active: { area: string; equipment: string; reason: string; minutes: number; start: number }[]
+  finished: { area: string; equipment: string; reason: string; minutes: number }[]
+}
+
+/** Сообщение потока /api/stream. */
+export interface LiveState {
+  running: boolean
+  shift: LiveShift | null
+  version: number
+}
