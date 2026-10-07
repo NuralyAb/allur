@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Проверка моделей Allur</title><style>body{margin:0;background:#bfc8cc;font:15px system-ui}nav{position:absolute;z-index:2;top:20px;left:20px;display:flex;gap:10px}a{padding:12px;background:white;color:#222;border-radius:8px;text-decoration:none}#info{position:absolute;bottom:20px;left:20px}canvas{display:block}</style></head><body><nav><a href="?model=cobalt">Chevrolet Cobalt</a><a href="?model=j7">JAC J7</a></nav><div id="info"></div><script type="module">
+import * as T from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+const model=new URLSearchParams(location.search).get('model')==='j7'?'j7':'cobalt';
+const renderer=new T.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.toneMapping=T.ACESFilmicToneMapping;document.body.append(renderer.domElement);
+const scene=new T.Scene();scene.background=new T.Color('#cbd2d5');scene.environment=new T.PMREMGenerator(renderer).fromScene(new RoomEnvironment()).texture;
+const camera=new T.PerspectiveCamera(40,innerWidth/innerHeight,.05,100);camera.position.set(6,3.5,6);const controls=new OrbitControls(camera,renderer.domElement);controls.target.set(0,.7,0);controls.update();scene.add(new T.HemisphereLight('#ffffff','#53635f',1));const sun=new T.DirectionalLight('#fff9ed',2);sun.position.set(5,8,4);scene.add(sun);
+const floor=new T.Mesh(new T.PlaneGeometry(100,100),new T.MeshStandardMaterial({color:'#a1a9a8',roughness:.85}));floor.rotation.x=-Math.PI/2;floor.position.y=-.01;scene.add(floor);
+const asset=await new GLTFLoader().loadAsync('/models/review-'+model+(new URLSearchParams(location.search).has('original')?'-original':'')+'.glb');const root=new T.Group();root.add(asset.scene);root.rotation.y=-Math.PI/2;const box=new T.Box3().setFromObject(root,true),size=box.getSize(new T.Vector3()),center=box.getCenter(new T.Vector3());const scale=(model==='j7'?4.772:4.479)/size.x;root.scale.setScalar(scale);root.position.set(-center.x*scale,-box.min.y*scale,-center.z*scale);scene.add(root);document.getElementById('info').textContent=model+' · '+size.multiplyScalar(scale).toArray().map(x=>x.toFixed(2)).join(' × ')+' м';renderer.setAnimationLoop(()=>renderer.render(scene,camera));
+</script></body></html>

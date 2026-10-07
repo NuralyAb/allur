@@ -69,10 +69,11 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
   const sourceLabel = live?.running ? 'Live · симулятор' : source?.source.startsWith('Импорт') ? 'Импорт' : source?.source.startsWith('Симулятор') ? 'Данные симулятора' : 'Данные кейса'
   const tour = useMemo(() => buildTour(plant.hall), [plant])
   const [selection, setSelection] = useState<Selection>(null)
-  const [roof, setRoof] = useState(false)
+  const [roof, setRoof] = useState(true)
   const [mood, setMood] = useState<LightMood>('day')
   const [detailed, setDetailed] = useState(true)
   const [help, setHelp] = useState(false)
+  const [sceneFocused, setSceneFocused] = useState(false)
   const [labels, setLabels] = useState(false)
   const [shot, setShot] = useState<Shot | null>(null)
   const [step, setStep] = useState<number | null>(null)
@@ -88,6 +89,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
     if (analytics || decisions || sourceOpen) return
     const closePanel = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      if (sceneFocused) { setSceneFocused(false); return }
       if (simulationMode) { setSimulationPanel(false); return }
       if (navigation) setNavigation(false)
       else if (help) setHelp(false)
@@ -95,7 +97,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
     }
     window.addEventListener('keydown', closePanel)
     return () => window.removeEventListener('keydown', closePanel)
-  }, [analytics, decisions, sourceOpen, navigation, help, simulationMode])
+  }, [analytics, decisions, sourceOpen, navigation, help, simulationMode, sceneFocused])
 
   useEffect(() => {
     const desktop = window.matchMedia('(min-width: 961px)')
@@ -194,6 +196,17 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
   }
 
   const overview = () => { setNavigation(false); setPlaying(false); setStep(null); setSelection(null); setShot(overviewShot(plant)) }
+  const focusOnix = async () => {
+    if (simulation.busy) return
+    if (simulationMode && simulation.snapshot && !await simulation.control('pause')) {
+      setSimulationPanel(true)
+      return
+    }
+    setSimulationMode(false)
+    setNavigation(false); setPlaying(false); setStep(null); setSelection(null); setHelp(false)
+    setRoof(false); setDetailed(true)
+    setShot({ ...overviewShot(plant), followOnix: true })
+  }
   const openAnalytics = () => { setNavigation(false); setPlaying(false); setAnalytics(true) }
   const openDecisions = () => { setNavigation(false); setPlaying(false); setDecisions(true) }
   // сцена тяжёлая: пересоздаём элемент только при изменении её входов, а не на каждом сообщении потока
@@ -202,7 +215,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
   const bottleneck = plant.zones.find(z => z.kpiArea === insights.base.bottleneck)
 
   return (
-    <div className={`app${navigation ? ' navigation-open' : ''}`}>
+    <div className={`app${navigation ? ' navigation-open' : ''}${sceneFocused ? ' scene-focused' : ''}`}>
       <a className="skip-link" href="#main-content">Перейти к рабочей области</a>
       {navigation && <button className="navigation-backdrop" aria-label="Закрыть навигацию" onClick={() => setNavigation(false)} />}
       <ZoneList open={navigation} plant={plant} status={insights.status} insights={insights} selection={selection} onZone={selectZone} onOutdoor={selectOutdoor} onClose={() => setNavigation(false)} onOverview={overview} onAnalytics={openAnalytics} onDecisions={openDecisions} />
@@ -213,13 +226,13 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
         {!simulationMode && live?.shift && <LiveStrip shift={live.shift} onArea={showArea} />}
         <section className={`scene-stage${selection ? ' has-selection' : ''}${step !== null ? ' touring' : ''}`} aria-label="Интерактивная 3D-модель завода">
           <div className="scene-canvas"><SceneBoundary>{scene}</SceneBoundary></div>
-          <div className="stage-toolbar"><div className="stage-title"><span className="stage-icon"><Icon name="box" size={18} /></span><div><strong>Цифровой двойник</strong><span>Интерактивная модель площадки</span></div><span className="stage-badge">3D</span></div><div className="stage-modes" role="group" aria-label="Отображение завода"><button aria-pressed={roof} className={roof ? 'active' : ''} onClick={() => { setPlaying(false); setRoof(true) }}><Icon name="roof" size={15} />Площадка</button><button aria-pressed={!roof} className={!roof ? 'active' : ''} onClick={() => { setPlaying(false); setRoof(false) }}><Icon name="layers" size={15} />Цеха</button></div><div className="stage-actions"><button className="icon-button" aria-label={mood === 'day' ? 'Включить вечернее освещение' : 'Включить дневное освещение'} title={mood === 'day' ? 'Свет: день' : 'Свет: золотой час'} onClick={() => setMood(mood === 'day' ? 'sunset' : 'day')}><Icon name={mood === 'day' ? 'sun' : 'moon'} /></button><button className={`icon-button${detailed ? ' selected' : ''}`} aria-pressed={detailed} aria-label="Детальное качество изображения" title={detailed ? 'Качество: высокое. Нажмите для экономичного режима' : 'Качество: экономичное. Нажмите для высокого качества'} onClick={() => setDetailed(v => !v)}><Icon name="settings" /></button><button className={`icon-button${help ? ' selected' : ''}`} aria-label="Как управлять моделью" aria-expanded={help} aria-controls="scene-help" onClick={() => setHelp(v => !v)}><Icon name="info" /></button></div></div>
+          <div className="stage-toolbar"><div className="stage-title"><span className="stage-icon"><Icon name="box" size={18} /></span><div><strong>Цифровой двойник</strong><span>Интерактивная модель площадки</span></div><span className="stage-badge">3D</span></div><div className="stage-modes" role="group" aria-label="Отображение завода"><button aria-pressed={roof} className={roof ? 'active' : ''} onClick={() => { setPlaying(false); setRoof(true) }}><Icon name="roof" size={15} />Площадка</button><button aria-pressed={!roof} className={!roof ? 'active' : ''} onClick={() => { setPlaying(false); setRoof(false) }}><Icon name="layers" size={15} />Цеха</button></div><div className="stage-actions"><button className="icon-button" aria-label={mood === 'day' ? 'Включить вечернее освещение' : 'Включить дневное освещение'} title={mood === 'day' ? 'Свет: день' : 'Свет: золотой час'} onClick={() => setMood(mood === 'day' ? 'sunset' : 'day')}><Icon name={mood === 'day' ? 'sun' : 'moon'} /></button><button className={`icon-button${detailed ? ' selected' : ''}`} aria-pressed={detailed} aria-label="Детальное качество изображения" title={detailed ? 'Качество: высокое. Нажмите для экономичного режима' : 'Качество: экономичное. Нажмите для высокого качества'} onClick={() => setDetailed(v => !v)}><Icon name="settings" /></button><button className={`icon-button${sceneFocused ? ' selected' : ''}`} aria-label={sceneFocused ? 'Свернуть 3D-сцену' : 'Развернуть 3D-сцену'} aria-pressed={sceneFocused} title={sceneFocused ? 'Вернуть показатели · Escape' : 'Развернуть 3D-сцену'} onClick={() => setSceneFocused(v => !v)}><Icon name="expand" /></button><button className={`icon-button${help ? ' selected' : ''}`} aria-label="Как управлять моделью" aria-expanded={help} aria-controls="scene-help" onClick={() => setHelp(v => !v)}><Icon name="info" /></button></div></div>
           {help && <div className="scene-help" id="scene-help"><strong>Исследуйте завод</strong><p>Перетаскивание — поворот камеры.<br />Колесо мыши — приближение.<br />Правая кнопка — перемещение.</p><p>На телефоне: один палец — поворот,<br />два пальца — масштаб и перемещение.</p><span>Выберите участок, чтобы увидеть детали.</span><button className="text-button" onClick={() => setHelp(false)}>Понятно <Icon name="check" size={14} /></button></div>}
-          <div className="scene-topline"><span className="model-note"><span />{roof ? 'Внешний вид площадки' : 'Внутреннее устройство'}<span className="model-note-divider">/</span>Реконструкция</span>{bottleneck && <button className="bottleneck-chip" onClick={() => selectZone(bottleneck)}><Icon name="alert" size={13} />Узкое место: {insights.base.bottleneck.toLowerCase()}<Icon name="chevron-right" size={13} /></button>}</div>
+          <div className="scene-topline"><span className="model-note"><span />{roof ? 'Внешний вид площадки' : 'Внутреннее устройство'}<span className="model-note-divider">/</span>Реконструкция</span><button className="bottleneck-chip" disabled={simulation.busy} onClick={() => void focusOnix()} title="Приблизить Chevrolet Onix и следовать за ним. Перетаскивание останавливает слежение."><Icon name="search" size={13} />Рассмотреть Onix</button>{bottleneck && <button className="bottleneck-chip" onClick={() => selectZone(bottleneck)}><Icon name="alert" size={13} />Узкое место: {insights.base.bottleneck.toLowerCase()}<Icon name="chevron-right" size={13} /></button>}</div>
           <div className="scene-panels">{simulationMode ? simulationPanel && <SimulationPanel simulation={simulation} onAsset={selectAsset} onHide={() => setSimulationPanel(false)} /> : <ZonePanel key={selection?.zone.id} plant={plant} kpi={kpi} insights={insights} onDecisions={openDecisions} selection={selection} onClose={() => setSelection(null)} />}</div>
           <div className="scene-bottom"><div className="scene-legend"><span><i className="legend-ok" />В норме</span><span><i className="legend-warn" />Внимание</span><span><i className="legend-bad" />Отклонение</span></div>{simulationMode ? <SimulationTransport simulation={simulation} panel={simulationPanel} onPanel={() => setSimulationPanel((v) => !v)} roof={roof} onRoof={() => setRoof((v) => !v)} onOverview={() => { setShot(overviewShot(plant)); setRoof(true) }} /> : <TourBar stops={tour} index={step} playing={playing} roof={roof} labels={labels} onPlay={() => { setPlaying(true); goTo(step === null || step >= tour.length - 1 ? 0 : step) }} onStop={() => setPlaying(false)} onStep={goTo} onRoof={() => { setPlaying(false); setRoof(r => !r) }} onLabels={() => setLabels(l => !l)} onOverview={overview} />}<div className="scene-hint"><Icon name="rotate" size={13} />Вращайте · приближайте · исследуйте</div></div>
         </section>
-        <footer className="workspace-footer"><span><span className="footer-dot" />{source?.source ?? 'Данные кейса'} · {fmtDate(kpi.date)}<span className="footer-separator">|</span>Движение в сцене — симуляция</span><span className="attrib">© OpenStreetMap · Esri World Imagery<span className="footer-separator">|</span>Расстановка: НДВ, 2022</span></footer>
+        <footer className="workspace-footer"><span><span className="footer-dot" />{source?.source ?? 'Данные кейса'} · {fmtDate(kpi.date)}<span className="footer-separator">|</span>Движение в сцене — симуляция</span><span className="attrib">Геометрия: © OpenStreetMap<span className="footer-separator">|</span>Расстановка: НДВ, 2022<span className="footer-separator">|</span><a href="/models/credits.html" target="_blank" rel="noopener noreferrer">3D-модели</a></span></footer>
       </main>
       {analytics && <AnalyticsPanel kpi={kpi} onClose={() => setAnalytics(false)} onArea={showArea} />}
       {decisions && <DecisionsPanel insights={insights} onClose={() => setDecisions(false)} onArea={showArea} />}

@@ -4,6 +4,10 @@ import type { CarModelId } from './carModels'
 export interface GlbAssetSpec {
   /** A self-hosted, self-contained model beneath public/models/. */
   url: string
+  /** Optional simplified derivative of the same source for distant fleet instances. */
+  lodUrl?: string
+  /** Silhouette-preserving derivative for a site-wide view. */
+  distantUrl?: string
   /** Intended length along the scene's X axis, in metres after rotation. */
   length: number
   /** Rotation about Y in radians; the front of a car should face +X. */
@@ -41,6 +45,8 @@ function parseAsset(value: unknown, name: string): GlbAssetSpec | null {
   if (
     !isRecord(value) ||
     typeof value.url !== 'string' || !LOCAL_MODEL_URL.test(value.url) ||
+    (value.lodUrl !== undefined && (typeof value.lodUrl !== 'string' || !LOCAL_MODEL_URL.test(value.lodUrl))) ||
+    (value.distantUrl !== undefined && (typeof value.distantUrl !== 'string' || !LOCAL_MODEL_URL.test(value.distantUrl))) ||
     typeof value.length !== 'number' || !Number.isFinite(value.length) || value.length < 0.1 || value.length > (name === 'conveyor' ? 12.8 : 100) ||
     typeof value.rotationY !== 'number' || !Number.isFinite(value.rotationY) || Math.abs(value.rotationY) > Math.PI * 2 ||
     !hasText(value.source) || !hasText(value.author) || !hasText(value.license)
@@ -50,6 +56,8 @@ function parseAsset(value: unknown, name: string): GlbAssetSpec | null {
 
   return {
     url: value.url,
+    ...(typeof value.lodUrl === 'string' ? { lodUrl: value.lodUrl } : {}),
+    ...(typeof value.distantUrl === 'string' ? { distantUrl: value.distantUrl } : {}),
     length: value.length,
     rotationY: value.rotationY,
     source: value.source.trim(),

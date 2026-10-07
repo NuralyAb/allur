@@ -5,6 +5,7 @@ import { CAR_COLORS, MAT, paint, unitBox } from './assets'
 import { Car, type CarHandle } from './Car'
 import { pickModel } from './carModels'
 import { Instanced } from './Hall'
+import { Conveyor, ControlCabinets, type IndustrialItem } from './Industrial'
 import { Label } from './Label'
 import { makePath, mod, placeOnPath, type P3 } from './motion'
 import { Robot } from './Robot'
@@ -54,7 +55,7 @@ const liquidMats = LIQUID.map((c, i) =>
 )
 const boothGlass = new MeshStandardMaterial({ color: '#cfe3f1', transparent: true, opacity: 0.22, roughness: 0.05, depthWrite: false })
 const boothLight = new MeshBasicMaterial({ color: new Color(1.15, 1.15, 1.1), toneMapped: false })
-const ovenGlow = new MeshBasicMaterial({ color: new Color(3, 1.1, 0.25), toneMapped: false })
+const ovenGlow = new MeshBasicMaterial({ color: new Color(1.2, 0.55, 0.22), toneMapped: false })
 const ovenSkin = paint('#c3c8cd', 0.85, 0.3)
 
 function dip(u: number) {
@@ -106,8 +107,26 @@ function Bodies() {
 }
 
 function Tanks() {
+  const details = useMemo(() => {
+    const steel: IndustrialItem[] = []
+    const safety: IndustrialItem[] = []
+    TANKS.forEach((c) => {
+      for (const side of [-1, 1]) {
+        steel.push({ p: [c, 1.32, -V1 + side * 1.9], s: [6.25, 0.08, 0.35] })
+        steel.push({ p: [c, 0.4, -V1 + side * 2.75], s: [6.6, 0.1, 1.1] })
+        for (const dx of [-3, 0, 3]) {
+          steel.push({ p: [c + dx, 0.65, -V1 + side * 2.06], s: [0.08, 1.3, 0.05] })
+          safety.push({ p: [c + dx, 0.94, -V1 + side * 3.25], s: [0.06, 1.12, 0.06] })
+        }
+        for (const y of [0.9, 1.45]) safety.push({ p: [c, y, -V1 + side * 3.25], s: [6.8, 0.055, 0.055] })
+      }
+    })
+    return { steel, safety }
+  }, [])
   return (
     <group>
+      <Instanced geometry={unitBox} material={MAT.steel} items={details.steel} />
+      <Instanced geometry={unitBox} material={paint('#bea267', 0.3, 0.5)} items={details.safety} />
       {TANKS.map((c, k) => (
         <group key={k} position={[c, 0, -V1]}>
           {/* борта ванны */}
@@ -177,6 +196,11 @@ function Booth({ u0, u1, label, robotsPerSide }: { u0: number; u1: number; label
       <mesh geometry={unitBox} material={MAT.steel} scale={[len, 0.25, 0.25]} position={[0, 4.7, -4.2]} />
       <mesh geometry={unitBox} material={boothLight} scale={[len - 1, 0.06, 0.25]} position={[0, 4.55, 2.4]} />
       <mesh geometry={unitBox} material={boothLight} scale={[len - 1, 0.06, 0.25]} position={[0, 4.55, -2.4]} />
+      <Instanced geometry={unitBox} material={MAT.wall} items={Array.from({ length: Math.ceil(len / 3) + 1 }, (_, i) => -len / 2 + i * len / Math.ceil(len / 3)).flatMap((x) => [
+        { p: [x, 2.35, 4.2] as [number, number, number], s: [0.12, 4.7, 0.18] as [number, number, number] },
+        { p: [x, 2.35, -4.2] as [number, number, number], s: [0.12, 4.7, 0.18] as [number, number, number] },
+        { p: [x, 4.7, 0] as [number, number, number], s: [0.12, 0.18, 8.5] as [number, number, number] },
+      ])} />
       {/* решётчатый пол кабины */}
       <mesh geometry={unitBox} material={MAT.darkSteel} scale={[len, 0.1, 8.3]} position={[0, 0.06, 0]} />
       {Array.from({ length: robotsPerSide }, (_, i) =>
@@ -222,6 +246,8 @@ export function Paint() {
     <group position={[470, 0, 66]} rotation={[0, Math.PI / 2, 0]}>
       <Enclosure />
       <Tanks />
+      {[V2, V3, V4].map((v) => <Conveyor key={v} length={102} width={2.8} height={0.5} position={[213, 0, -v]} rollers />)}
+      <ControlCabinets positions={[[174, 0, -172], [197, 0, -172], [229, 0, -172], [255, 0, -172]]} />
       <Oven u0={205} u1={258} v={V2} label="Печь сушки катафореза" />
       <Oven u0={176} u1={254} v={V4} label="Печь финишной сушки" />
       {/* герметизация швов */}

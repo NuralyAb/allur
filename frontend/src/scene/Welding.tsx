@@ -6,6 +6,7 @@ import { Car, type CarHandle } from './Car'
 import { pickModel, type CarModelId } from './carModels'
 import { L } from './geo'
 import { Instanced } from './Hall'
+import { Conveyor, ControlCabinets, PartsRacks } from './Industrial'
 import { Label } from './Label'
 import { indexed, isDwelling, mod } from './motion'
 import { Robot } from './Robot'
@@ -83,10 +84,8 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
 
   return (
     <group>
-      {/* челночный конвейер */}
-      <mesh geometry={unitBox} material={MAT.darkSteel} scale={[uEnd - U0 + 6, 0.5, 1.6]} position={[(U0 + uEnd) / 2, 0.25, -v]} receiveShadow />
-      <mesh geometry={unitBox} material={MAT.yellow} scale={[uEnd - U0 + 6, 0.06, 0.12]} position={[(U0 + uEnd) / 2, 0.52, -(v + 0.8)]} />
-      <mesh geometry={unitBox} material={MAT.yellow} scale={[uEnd - U0 + 6, 0.06, 0.12]} position={[(U0 + uEnd) / 2, 0.52, -(v - 0.8)]} />
+      <Conveyor length={uEnd - U0 + 6} width={1.8} height={0.5} rollers position={[(U0 + uEnd) / 2, 0, -v]} />
+      <ControlCabinets positions={[U0 + 12, U0 + 42, U0 + 72].map((u) => [u, 0, -v + 6.5])} />
       <Instanced geometry={unitBox} material={fenceMat} items={fence} />
       <Instanced geometry={unitBox} material={MAT.yellow} items={posts} />
 
@@ -128,7 +127,7 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
 
       {/* пост загрузки основания кузова */}
       <Worker position={[U0 - 1, 0, -(v + 2.6)]} yaw={-Math.PI / 2} phase={index * 3} />
-      <mesh geometry={unitBox} material={MAT.blueRack} scale={[2.4, 1.6, 1.2]} position={[U0 - 3, 0.8, -(v + 4)]} />
+      <PartsRacks width={2.4} positions={[[U0 - 3, 0, -(v + 4)]]} />
 
       <Label position={[U0 - 6, 5, -v]} color="#ff8a3d" small>
         Линия {index + 1} · {model}

@@ -1,7 +1,9 @@
+import { useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import { Color, InstancedMesh, MeshStandardMaterial, Object3D } from 'three'
-import { MAT } from './assets'
+import { Color, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D } from 'three'
+import { MAT, paint } from './assets'
 import { CARS, vertexColored, type CarModelId } from './carModels'
+import { useVehicleFleet, type FleetVehicle } from './VehicleFleet'
 
 export interface ParkedCar {
   p: [number, number, number]
@@ -36,6 +38,34 @@ export function ParkedCars({ cars, wheels = true, glass = true, details = true }
 
 function ModelInstances({ model, cars, wheels, glass, details }: { model: CarModelId; cars: ParkedCar[] } & Required<Opts>) {
   const geo = CARS[model]
+  const parent = useRef<Group>(null!)
+  const fleet = useVehicleFleet()
+  const entries = useMemo<FleetVehicle[]>(() => cars.map((car) => {
+    const root = new Group()
+    root.position.set(...car.p)
+    root.rotation.y = car.r
+    const fallback = new Group()
+    const body = new Mesh(undefined, paint(car.color))
+    const gl = new Mesh(undefined, MAT.glass)
+    gl.visible = glass
+    const wh = new Group()
+    wh.visible = wheels
+    const dt = new Mesh()
+    dt.visible = details
+    root.add(fallback)
+    return { model, root, fallback, body, glass: gl, wheels: wh, details: dt }
+  }), [cars, model, wheels, glass, details])
+  const shown = useRef<boolean[]>([])
+  const matrix = useMemo(() => new Object3D(), [])
+
+  useLayoutEffect(() => {
+    if (!fleet) return
+    for (const entry of entries) { parent.current.add(entry.root); fleet.vehicles.add(entry) }
+    shown.current = entries.map(() => true)
+    return () => {
+      for (const entry of entries) { fleet.vehicles.delete(entry); entry.root.removeFromParent() }
+    }
+  }, [fleet, entries])
   const body = useRef<InstancedMesh>(null!)
   const gl = useRef<InstancedMesh>(null)
   const wh = useRef<InstancedMesh>(null)
@@ -60,8 +90,24 @@ function ModelInstances({ model, cars, wheels, glass, details }: { model: CarMod
     }
   }, [cars, wheels, glass, details])
 
+  useFrame(() => {
+    let changed = false
+    entries.forEach((entry, index) => {
+      const visible = entry.fallback.visible
+      if (shown.current[index] === visible) return
+      shown.current[index] = visible
+      matrix.position.copy(entry.root.position)
+      matrix.rotation.copy(entry.root.rotation)
+      matrix.scale.setScalar(visible ? 1 : 0)
+      matrix.updateMatrix()
+      for (const mesh of [body.current, gl.current, wh.current, dt.current]) mesh?.setMatrixAt(index, matrix.matrix)
+      changed = true
+    })
+    if (changed) for (const mesh of [body.current, gl.current, wh.current, dt.current]) if (mesh) mesh.instanceMatrix.needsUpdate = true
+  })
+
   return (
-    <group>
+    <group ref={parent}>
       <instancedMesh ref={body} args={[geo.body, bodyMat, cars.length]} castShadow />
       {glass && <instancedMesh ref={gl} args={[geo.glass, MAT.glass, cars.length]} />}
       {details && <instancedMesh ref={dt} args={[geo.details, vertexColored, cars.length]} />}

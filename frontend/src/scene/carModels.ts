@@ -7,6 +7,7 @@ import {
   Float32BufferAttribute,
   MeshStandardMaterial,
   Shape,
+  TorusGeometry,
 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
@@ -183,6 +184,15 @@ function extrudeCentered(shape: Shape, s: Spec, width: number, bevel: number) {
     curveSegments: 6,
   })
   g.translate(-s.length / 2, 0, -(width - bevel * 2) / 2)
+  // Real cabins taper inward above the beltline; a constant-width extrusion
+  // made roofs as wide as the doors and gave every distant car a toy silhouette.
+  const vertices = g.getAttribute('position')
+  for (let i = 0; i < vertices.count; i++) {
+    const x = vertices.getX(i), y = vertices.getY(i)
+    const cabin = Math.max(0, Math.min(1, (y - 0.91) / 0.57))
+    const nose = Math.max(0, (Math.abs(x) - s.length * 0.35) / (s.length * 0.15))
+    vertices.setZ(i, vertices.getZ(i) * (1 - cabin * 0.23) * (1 - nose * 0.07))
+  }
   g.computeVertexNormals()
   return g
 }
@@ -236,19 +246,46 @@ function detailsGeo(s: Spec) {
     parts.push(part(s, -0.01, 0.66, 0, 0.04, 0.06, 0.22, CHROME))
     parts.push(part(s, L - 0.05, s.taillightY, 0, 0.1, 0.07, W - 0.24, TAIL))
   }
+  // Fine door shut lines, handles and a B-pillar make the silhouette readable in LOD.
+  const beltY = s.glass[0][1]
+  const frontDoor = s.glass[0][0] + 0.62
+  const rearDoor = s.glass[2][0] + 0.02
+  for (const side of [-1, 1]) {
+    const z = side * (W / 2 + 0.008)
+    for (const x of [frontDoor, rearDoor]) {
+      parts.push(part(s, x, beltY - 0.075, z, 0.14, 0.035, 0.026, CHROME))
+      parts.push(part(s, x + 0.19, 0.68, z, 0.008, 0.45, 0.012, '#4b5159'))
+    }
+    parts.push(part(s, (frontDoor + rearDoor) / 2, 0.39, z, rearDoor - frontDoor + 0.7, 0.04, 0.023, DARK))
+    parts.push(part(s, (s.glass[0][0] + s.glass[2][0]) / 2, 1.2, side * W * 0.45, 0.055, 0.33, 0.04, DARK))
+  }
   return mergeGeometries(parts)!
 }
 
 function wheelGeoFor(r: number) {
-  const tyre = new CylinderGeometry(r, r, 0.21, 20).rotateX(Math.PI / 2).toNonIndexed()
-  const rim = new CylinderGeometry(r * 0.64, r * 0.64, 0.222, 14).rotateX(Math.PI / 2).toNonIndexed()
-  const paintGeo = (g: BufferGeometry, color: string) => {
+  const paintGeo = (geometry: BufferGeometry, color: string) => {
+    const g = geometry.index ? geometry.toNonIndexed() : geometry
     const c = new Color(color)
     const n = g.getAttribute('position').count
-    g.setAttribute('color', new Float32BufferAttribute(Array.from({ length: n * 3 }, (_, i) => [c.r, c.g, c.b][i % 3]), 3))
+    const colors = new Float32Array(n * 3)
+    for (let i = 0; i < n; i++) colors.set([c.r, c.g, c.b], i * 3)
+    g.setAttribute('color', new Float32BufferAttribute(colors, 3))
     return g
   }
-  return mergeGeometries([paintGeo(tyre, '#121314'), paintGeo(rim, '#b9bfc6')])!
+  const parts: BufferGeometry[] = [
+    paintGeo(new CylinderGeometry(r * 0.96, r * 0.96, 0.16, 24).rotateX(Math.PI / 2), '#101215'),
+  ]
+  for (const side of [-1, 1]) {
+    parts.push(paintGeo(new TorusGeometry(r * 0.79, r * 0.2, 6, 24).translate(0, 0, side * 0.075), '#202328'))
+    parts.push(paintGeo(new CylinderGeometry(r * 0.53, r * 0.53, 0.018, 24).rotateX(Math.PI / 2).translate(0, 0, side * 0.106), '#596067'))
+    parts.push(paintGeo(new TorusGeometry(r * 0.61, 0.016, 5, 24).translate(0, 0, side * 0.123), '#c2c9d0'))
+    parts.push(paintGeo(new CylinderGeometry(r * 0.14, r * 0.14, 0.035, 10).rotateX(Math.PI / 2).translate(0, 0, side * 0.127), '#bdc4cb'))
+    for (let spoke = 0; spoke < 5; spoke++) {
+      const angle = spoke * Math.PI * 2 / 5
+      parts.push(paintGeo(new BoxGeometry(0.033, r * 0.46, 0.025).translate(0, r * 0.37, side * 0.132).rotateZ(angle), '#c6ccd2'))
+    }
+  }
+  return mergeGeometries(parts)!
 }
 
 export interface CarGeometry {

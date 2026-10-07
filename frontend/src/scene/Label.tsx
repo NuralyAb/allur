@@ -35,7 +35,7 @@ export function Label({
     const d = camera.position.distanceTo(group.current.getWorldPosition(wp))
     // Hysteresis avoids flickering at a distance threshold. Start hidden so
     // distant equipment labels do not flash for one frame when the roof opens.
-    const visible = small ? d < (shown.current ? 130 : 110) : d > (shown.current ? 50 : 70)
+    const visible = small ? d < (shown.current ? 68 : 58) : d > (shown.current ? 50 : 70)
     if (visible !== shown.current) {
       shown.current = visible
       div.current.style.opacity = visible ? '1' : '0'

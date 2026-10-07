@@ -1,8 +1,9 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import { MeshStandardMaterial, type Group, type Mesh } from 'three'
-import { CAR_COLORS, MAT, paint, unitBox } from './assets'
+import { CAR_COLORS, MAT, paint, unitBox, wheelGeo } from './assets'
 import { Instanced } from './Hall'
+import { PartsRacks, type IndustrialItem } from './Industrial'
 import { Label } from './Label'
 import { makePath, mod, placeOnPath, type P3 } from './motion'
 import { pickModel } from './carModels'
@@ -12,8 +13,8 @@ import { Worker } from './Worker'
 
 type Item = { p: [number, number, number]; s: [number, number, number] }
 
-const forkliftMat = paint('#f2a900', 0.2, 0.5)
-const containerMat = paint('#1f5fae', 0.4, 0.55)
+const forkliftMat = paint('#c9a24f', 0.2, 0.5)
+const containerMat = paint('#506d7c', 0.4, 0.55)
 const cabMat = paint('#e9ecef', 0.3, 0.4)
 const bumperMats = { raw: paint('#2b2d31', 0, 0.8), done: CAR_COLORS.map((c) => paint(c)) }
 const boothGlass = new MeshStandardMaterial({ color: '#cfe3f1', transparent: true, opacity: 0.22, depthWrite: false })
@@ -30,29 +31,43 @@ const BAY = 2.8
 const LEVELS = [0.15, 2.25, 4.35, 6.45]
 
 function Racks() {
-  const { uprights, beams, boxes } = useMemo(() => {
+  const { uprights, beams, boxes, pallets, straps } = useMemo(() => {
     const uprights: Item[] = []
     const beams: Item[] = []
     const boxes: Item[] = []
+    const pallets: Item[] = []
+    const straps: Item[] = []
     for (const u of RACK_ROWS) {
       for (let v = 14; v <= 150; v += BAY) {
-        uprights.push({ p: [u, 4, -v], s: [1.1, 8, 0.12] })
+        for (const side of [-1, 1]) {
+          uprights.push({ p: [u + side * 0.52, 4, -v], s: [0.1, 8, 0.12] })
+          uprights.push({ p: [u + side * 0.52, 0.04, -v], s: [0.24, 0.08, 0.28] })
+        }
+        for (const y of [0.3, 2.1, 4.2, 6.3, 7.8]) uprights.push({ p: [u, y, -v], s: [1.1, 0.07, 0.06] })
         if (v + BAY > 150) continue
         for (const [li, y] of LEVELS.entries()) {
-          if (li > 0) beams.push({ p: [u, y - 0.08, -(v + BAY / 2)], s: [1.15, 0.14, BAY] })
+          for (const side of [-1, 1]) beams.push({ p: [u + side * 0.5, y - 0.08, -(v + BAY / 2)], s: [0.09, 0.14, BAY] })
           // заполненность ~80%, детерминированно
-          if ((Math.sin(u * 7.1 + v * 3.3 + li * 11.7) + 1) / 2 < 0.8)
-            boxes.push({ p: [u, y + 0.75, -(v + BAY / 2)], s: [1.0, 1.4, BAY - 0.35] })
+          if ((Math.sin(u * 7.1 + v * 3.3 + li * 11.7) + 1) / 2 < 0.8) {
+            for (const dz of [-0.62, 0.62]) {
+              boxes.push({ p: [u, y + 0.68, -(v + BAY / 2) + dz], s: [0.95, 1.02, 1.08] })
+              pallets.push({ p: [u, y + 0.1, -(v + BAY / 2) + dz], s: [1.05, 0.14, 1.15] })
+              straps.push({ p: [u, y + 1.2, -(v + BAY / 2) + dz], s: [0.96, 0.02, 0.055] })
+              for (const side of [-1, 1]) straps.push({ p: [u + side * 0.48, y + 0.68, -(v + BAY / 2) + dz], s: [0.012, 1.03, 0.055] })
+            }
+          }
         }
       }
     }
-    return { uprights, beams, boxes }
+    return { uprights, beams, boxes, pallets, straps }
   }, [])
   return (
     <group>
-      <Instanced geometry={unitBox} material={MAT.blueRack} items={uprights} />
-      <Instanced geometry={unitBox} material={MAT.orangeRack} items={beams} />
+      <Instanced geometry={unitBox} material={paint('#566a76', 0.5, 0.52)} items={uprights} />
+      <Instanced geometry={unitBox} material={paint('#b69659', 0.3, 0.55)} items={beams} />
       <Instanced geometry={unitBox} material={MAT.carton} items={boxes} />
+      <Instanced geometry={unitBox} material={paint('#806f58', 0, 0.88)} items={pallets} />
+      <Instanced geometry={unitBox} material={MAT.darkSteel} items={straps} />
     </group>
   )
 }
@@ -69,12 +84,27 @@ function Forklift({ u, v0, v1, phase }: { u: number; v0: number; v1: number; pha
   })
   return (
     <group ref={ref}>
-      <mesh geometry={unitBox} material={forkliftMat} scale={[2.2, 1.2, 1.2]} position={[-0.3, 0.75, 0]} />
-      <mesh geometry={unitBox} material={MAT.darkSteel} scale={[1.1, 1.1, 1.1]} position={[-0.5, 1.9, 0]} />
-      <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.12, 3.6, 0.9]} position={[0.85, 1.8, 0]} />
+      <mesh geometry={unitBox} material={forkliftMat} scale={[1.85, 0.72, 1.15]} position={[-0.3, 0.72, 0]} castShadow />
+      <mesh geometry={unitBox} material={forkliftMat} scale={[0.5, 0.45, 1.1]} position={[-1, 1.14, 0]} />
+      <Instanced geometry={unitBox} material={MAT.darkSteel} items={[
+        ...[-0.7, 0.45].flatMap((x) => [-0.55, 0.55].map((z) => ({ p: [x, 1.83, z] as [number, number, number], s: [0.075, 1.9, 0.075] as [number, number, number] }))),
+        { p: [-0.13, 2.76, 0], s: [1.32, 0.1, 1.24] },
+        { p: [-0.35, 1.15, 0], s: [0.55, 0.13, 0.55] },
+        { p: [-0.62, 1.42, 0], s: [0.13, 0.48, 0.55] },
+        { p: [0.25, 1.4, 0], s: [0.08, 0.5, 0.1] },
+        { p: [0.27, 1.67, 0], s: [0.32, 0.055, 0.32] },
+        ...[-0.4, 0.4].map((z) => ({ p: [0.85, 1.8, z] as [number, number, number], s: [0.14, 3.6, 0.14] as [number, number, number] })),
+        { p: [0.85, 3.54, 0], s: [0.14, 0.12, 0.93] },
+      ]} />
+      <Instanced geometry={wheelGeo} material={MAT.tyre} items={[-0.85, 0.55].flatMap((x) => [-0.59, 0.59].map((z) => ({ p: [x, 0.32, z] as [number, number, number], s: [1, 1, 1] as [number, number, number] })))} />
+      <Instanced geometry={wheelGeo} material={MAT.steel} items={[-0.85, 0.55].flatMap((x) => [-0.71, 0.71].map((z) => ({ p: [x, 0.32, z] as [number, number, number], s: [0.52, 0.52, 0.1] as [number, number, number] })))} />
       <group ref={forks}>
-        <mesh geometry={unitBox} material={MAT.steel} scale={[1.1, 0.06, 0.8]} position={[1.45, 0, 0]} />
-        <mesh geometry={unitBox} material={MAT.carton} scale={[1.0, 0.9, 1.0]} position={[1.45, 0.5, 0]} />
+        <Instanced geometry={unitBox} material={MAT.steel} items={[
+          { p: [0.99, 0.4, 0], s: [0.13, 0.8, 1.0] },
+          ...[-0.32, 0.32].map((z) => ({ p: [1.58, 0, z] as [number, number, number], s: [1.3, 0.06, 0.15] as [number, number, number] })),
+        ]} />
+        <mesh geometry={unitBox} material={MAT.carton} scale={[1.0, 0.8, 0.92]} position={[1.55, 0.54, 0]} />
+        <mesh geometry={unitBox} material={paint('#897353', 0, 0.9)} scale={[1.15, 0.12, 1.05]} position={[1.55, 0.08, 0]} />
       </group>
     </group>
   )
@@ -87,6 +117,18 @@ function DockTruck({ v }: { v: number }) {
       <mesh geometry={unitBox} material={containerMat} scale={[12.2, 2.6, 2.45]} position={[2, 2.6, 0]} />
       <mesh geometry={unitBox} material={MAT.darkSteel} scale={[12.6, 0.3, 2.4]} position={[2, 1.15, 0]} />
       <mesh geometry={unitBox} material={cabMat} scale={[2.3, 2.9, 2.45]} position={[-5.4, 1.9, 0]} />
+      <mesh geometry={unitBox} material={MAT.glass} scale={[0.035, 0.96, 2.16]} position={[-6.57, 2.58, 0]} />
+      <Instanced geometry={unitBox} material={MAT.glass} items={[-1, 1].map((side) => ({ p: [-5.53, 2.66, side * 1.236] as [number, number, number], s: [1.38, 0.78, 0.025] as [number, number, number] }))} />
+      <Instanced geometry={unitBox} material={MAT.darkSteel} items={[
+        { p: [-6.61, 1.05, 0], s: [0.15, 0.27, 2.5] },
+        { p: [-6.59, 1.58, 0], s: [0.045, 0.55, 1.45] },
+        ...[-1, 1].map((side) => ({ p: [-5.0, 0.62, side * 1.08] as [number, number, number], s: [1.1, 0.16, 0.4] as [number, number, number] })),
+      ]} />
+      <Instanced geometry={unitBox} material={MAT.wall} items={[-0.9, 0.9].map((z) => ({ p: [-6.64, 1.35, z] as [number, number, number], s: [0.04, 0.2, 0.36] as [number, number, number] }))} />
+      <Instanced geometry={wheelGeo} material={MAT.tyre} items={[-5.45, -2.7, 5.3, 6.5, 7.6].flatMap((x) => [-1.18, 1.18].map((z) => ({ p: [x, 0.53, z] as [number, number, number], s: [1.7, 1.7, 1.4] as [number, number, number] })))} />
+      <Instanced geometry={wheelGeo} material={MAT.steel} items={[-5.45, -2.7, 5.3, 6.5, 7.6].flatMap((x) => [-1.34, 1.34].map((z) => ({ p: [x, 0.53, z] as [number, number, number], s: [0.92, 0.92, 0.08] as [number, number, number] })))} />
+      <Instanced geometry={unitBox} material={paint('#647e8c', 0.4, 0.6)} items={Array.from({ length: 40 }, (_, i) => -3.8 + i * 0.3).flatMap((x) => [-1.24, 1.24].map((z) => ({ p: [x, 2.6, z] as [number, number, number], s: [0.075, 2.45, 0.045] as [number, number, number] })))} />
+      <Instanced geometry={unitBox} material={MAT.steel} items={[-0.86, -0.28, 0.28, 0.86].map((z) => ({ p: [8.13, 2.6, z] as [number, number, number], s: [0.045, 2.46, 0.045] as [number, number, number] }))} />
     </group>
   )
 }
@@ -149,14 +191,16 @@ function SmallParts() {
     for (const u of [10, 20, 30]) for (const v of [143, 153, 170, 180]) out.push({ u, v })
     return out
   }, [])
-  const tables: Item[] = benches.map((b) => ({ p: [b.u, 0.5, -b.v], s: [4, 1, 2] }))
+  const tables: IndustrialItem[] = benches.flatMap((b) => [
+    { p: [b.u, 0.95, -b.v], s: [4, 0.12, 2] },
+    ...[-1.8, 1.8].flatMap((x) => [-0.8, 0.8].map((z) => ({ p: [b.u + x, 0.45, -b.v + z] as [number, number, number], s: [0.12, 0.9, 0.12] as [number, number, number] }))),
+  ])
   const jigs: Item[] = benches.map((b) => ({ p: [b.u, 1.25, -b.v], s: [3.2, 0.5, 1.4] }))
-  const bins: Item[] = benches.map((b) => ({ p: [b.u, 0.6, -(b.v + 2.6)], s: [3, 1.2, 0.8] }))
   return (
     <group>
       <Instanced geometry={unitBox} material={MAT.darkSteel} items={tables} />
       <Instanced geometry={unitBox} material={MAT.steel} items={jigs} />
-      <Instanced geometry={unitBox} material={MAT.blueRack} items={bins} />
+      <PartsRacks width={3} positions={benches.map((b) => [b.u, 0, -(b.v + 2.6)])} />
       {benches.map((b, i) => (
         <Worker key={i} position={[b.u + (i % 2 ? 1 : -1), 0, -(b.v - 1.8)]} yaw={Math.PI / 2} phase={i * 0.9} />
       ))}

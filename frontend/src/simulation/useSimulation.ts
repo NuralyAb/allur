@@ -38,10 +38,13 @@ export function useSimulation(active: boolean) {
   useEffect(() => { if (active && !latest.current) void create() }, [active, create])
 
   const control = useCallback(async (action: ControlAction, extra?: { minutes?: number; speed?: number }) => {
-    if (!latest.current || pending.current) return
+    if (!latest.current || pending.current) return false
     pending.current = true; setBusy(true); setError(null)
-    try { accept(await request<SimulationSnapshot>(`/api/simulation/sessions/${latest.current.sessionId}/control`, { action, ...extra })) }
-    catch (e) { if (mounted.current) setError((e as Error).message) }
+    try {
+      accept(await request<SimulationSnapshot>(`/api/simulation/sessions/${latest.current.sessionId}/control`, { action, ...extra }))
+      return true
+    }
+    catch (e) { if (mounted.current) setError((e as Error).message); return false }
     finally { pending.current = false; if (mounted.current) setBusy(false) }
   }, [accept])
 

@@ -1,6 +1,6 @@
 import { useProductionFrame, useProductionEnabled, StageScope } from '../simulation/ProductionClock'
 import { Text } from '@react-three/drei'
-import { Suspense, useMemo, useRef } from 'react'
+import { Suspense, useMemo, useRef, type RefObject } from 'react'
 import { Color, InstancedMesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, type Group, type Mesh } from 'three'
 import { CAR_COLORS, MAT, paint, unitBox, unitCyl } from './assets'
 import { Car, type CarHandle } from './Car'
@@ -9,6 +9,7 @@ import { FinishedCar } from './FinishedCar'
 import { useGlbAssets } from './glbAssets'
 import { OptionalGlb } from './OptionalGlb'
 import { Instanced } from './Hall'
+import { Conveyor, ControlCabinets, PartsRacks } from './Industrial'
 import { Label } from './Label'
 import { makePath, mod, placeOnPath, type P3 } from './motion'
 import { Robot } from './Robot'
@@ -56,11 +57,10 @@ export const QC_PATH: P3[] = [
 ]
 
 const postLine = new MeshBasicMaterial({ color: '#f2c200' })
-const tunnelLight = new MeshBasicMaterial({ color: new Color(3, 3, 3), toneMapped: false })
+const tunnelLight = new MeshBasicMaterial({ color: new Color(1.25, 1.3, 1.34), toneMapped: false })
 const waterGlass = new MeshStandardMaterial({ color: '#7fb6e6', transparent: true, opacity: 0.25, roughness: 0.05, depthWrite: false })
 const dropMat = new MeshBasicMaterial({ color: '#d7ecff', transparent: true, opacity: 0.7, depthWrite: false })
 const lift = paint('#f2a900', 0.3, 0.5)
-const rackMat = paint('#5b6b7c', 0.4, 0.55)
 
 /** Конвейер сборки: кузов «обрастает» стёклами и колёсами по ходу. */
 function AssemblyCars() {
@@ -132,8 +132,7 @@ function HangerFollowers({
 }
 
 /** ОТК: готовые машины проходят испытательные посты. */
-function QcCars({ detailed }: { detailed: boolean }) {
-  const assets = useGlbAssets()
+function QcCars({ onixRef }: { detailed: boolean; onixRef?: RefObject<Group | null> }) {
   const path = useMemo(() => makePath(QC_PATH, 4), [])
   const length = useMemo(() => path.getLength(), [path])
   const spacing = 13
@@ -151,12 +150,9 @@ function QcCars({ detailed }: { detailed: boolean }) {
       {Array.from({ length: count }, (_, i) => (
         <FinishedCar
           key={i}
-          ref={(c) => void (cars.current[i] = c)}
+          ref={(c) => { cars.current[i] = c; if (i === 1 && onixRef) onixRef.current = c }}
           model={pickModel(i + 3)}
-          body={paint(CAR_COLORS[(i * 2) % 5])}
-          // First stage: one finished Onix in QC, never replace other car models.
-          spec={i === 1 ? assets.cars.onix : null}
-          detailed={detailed}
+          body={paint(CAR_COLORS[i === 1 ? 0 : (i * 2) % 5])}
         />
       ))}
     </group>
@@ -229,6 +225,12 @@ function QcStations() {
         <mesh geometry={unitBox} material={waterGlass} scale={[26, 4.5, 0.1]} position={[0, 2.25, 4]} />
         <mesh geometry={unitBox} material={waterGlass} scale={[26, 4.5, 0.1]} position={[0, 2.25, -4]} />
         <mesh geometry={unitBox} material={MAT.steel} scale={[26, 0.2, 8.2]} position={[0, 4.5, 0]} />
+        <Instanced geometry={unitBox} material={MAT.steel} items={Array.from({ length: 7 }, (_, i) => -12 + i * 4).flatMap((x) => [
+          { p: [x, 2.25, 4.05] as [number, number, number], s: [0.12, 4.5, 0.12] as [number, number, number] },
+          { p: [x, 2.25, -4.05] as [number, number, number], s: [0.12, 4.5, 0.12] as [number, number, number] },
+          { p: [x, 4.25, 0] as [number, number, number], s: [0.08, 0.08, 7.9] as [number, number, number] },
+        ])} />
+        <mesh geometry={unitBox} material={MAT.darkSteel} scale={[26, 0.04, 3]} position={[0, 0.02, 0]} />
         <Rain />
         <Label position={[0, 6.2, 0]} color="#f472b6" small>
           Дождевальная камера · герметичность
@@ -236,6 +238,12 @@ function QcStations() {
       </group>
       {/* световой туннель финальной инспекции */}
       <group position={[206, 0, -24]}>
+        <mesh geometry={unitBox} material={paint('#5b666d', 0.35, 0.5)} scale={[29, 0.03, 6.4]} position={[0, 0.025, 0]} receiveShadow />
+        <Instanced geometry={unitBox} material={MAT.darkSteel} items={Array.from({ length: 14 }, (_, i) => -13 + i * 2).flatMap((x) => [
+          { p: [x, 1.84, 3.06] as [number, number, number], s: [0.22, 3.68, 0.16] as [number, number, number] },
+          { p: [x, 1.84, -3.06] as [number, number, number], s: [0.22, 3.68, 0.16] as [number, number, number] },
+          { p: [x, 3.7, 0] as [number, number, number], s: [0.22, 0.16, 6.28] as [number, number, number] },
+        ])} />
         {Array.from({ length: 14 }, (_, i) => (
           <group key={i} position={[-13 + i * 2, 0, 0]}>
             <mesh geometry={unitBox} material={tunnelLight} scale={[0.15, 3.6, 0.1]} position={[0, 1.8, 3]} />
@@ -250,7 +258,11 @@ function QcStations() {
         </Label>
       </group>
       {/* ворота выезда в юго-западной стене */}
-      <mesh geometry={unitBox} material={MAT.darkSteel} scale={[5, 4.5, 0.7]} position={[157, 2.25, 0.2]} />
+      <Instanced geometry={unitBox} material={MAT.darkSteel} items={[
+        { p: [154.35, 2.3, 0.2], s: [0.25, 4.6, 0.4] },
+        { p: [159.65, 2.3, 0.2], s: [0.25, 4.6, 0.4] },
+        { p: [157, 4.65, 0.2], s: [5.55, 0.3, 0.45] },
+      ]} />
     </group>
   )
 }
@@ -262,15 +274,15 @@ function LineFurniture({ detailed }: { detailed: boolean }) {
   const sectionLength = conveyor?.length ?? POST
   const sectionX = UA + 10.5 * POST
   const { racks, slats, marks } = useMemo(() => {
-    const racks: { p: [number, number, number]; s: [number, number, number] }[] = []
+    const racks: [number, number, number][] = []
     const marks: { p: [number, number, number]; s: [number, number, number] }[] = []
     LANES.forEach((v) => {
       for (let k = 0; k <= 20; k++) {
         const u = UA + k * POST
         marks.push({ p: [u, 0.05, -v], s: [0.12, 0.02, 4.8] })
         if (k < 20) {
-          racks.push({ p: [u + POST / 2, 0.7, -(v - 4.6)], s: [3.6, 1.4, 0.9] })
-          racks.push({ p: [u + POST / 2, 0.7, -(v + 4.6)], s: [3.6, 1.4, 0.9] })
+          racks.push([u + POST / 2, 0, -(v - 4.6)])
+          racks.push([u + POST / 2, 0, -(v + 4.6)])
         }
       }
     })
@@ -298,16 +310,23 @@ function LineFurniture({ detailed }: { detailed: boolean }) {
 
   return (
     <group>
-      <Instanced geometry={unitBox} material={rackMat} items={racks} />
-      <Instanced geometry={unitBox} material={MAT.darkSteel} items={slats} />
+      <PartsRacks positions={racks} />
+      {slats.map((section, i) => <Conveyor key={i} length={section.s[0]} position={[section.p[0], 0, section.p[2]]} />)}
+      <ControlCabinets positions={posts.filter((p) => p.n % 5 === 0).map((p) => [p.u + 2.5, 0, -(p.v - 3.4)])} />
       <group position={[sectionX, 0, -LANES[2]]}>
         <OptionalGlb spec={conveyor} enabled={detailed} conveyor>
-          <mesh geometry={unitBox} material={MAT.darkSteel} scale={[sectionLength, 0.3, 3.2]} position={[0, 0.15, 0]} />
+          <Conveyor length={sectionLength} />
         </OptionalGlb>
       </group>
       <Instanced geometry={unitBox} material={postLine} items={marks} />
       {/* балка подвесного конвейера ветки B */}
       <mesh geometry={unitBox} material={MAT.darkSteel} scale={[UB - UA + 8, 0.5, 0.4]} position={[(UA + UB) / 2, 6.6, -LANES[1]]} />
+      <mesh geometry={unitBox} material={MAT.steel} scale={[UB - UA + 8, 0.09, 0.7]} position={[(UA + UB) / 2, 6.87, -LANES[1]]} />
+      <Instanced geometry={unitBox} material={MAT.darkSteel} items={Array.from({ length: 8 }, (_, i) => UA + i * (UB - UA) / 7).flatMap((u) => [
+        { p: [u, 3.35, -LANES[1] - 3.5] as [number, number, number], s: [0.18, 6.7, 0.2] as [number, number, number] },
+        { p: [u, 3.35, -LANES[1] + 3.5] as [number, number, number], s: [0.18, 6.7, 0.2] as [number, number, number] },
+        { p: [u, 6.65, -LANES[1]] as [number, number, number], s: [0.22, 0.3, 7.3] as [number, number, number] },
+      ])} />
       {/* номера постов: шрифт грузится отдельно и не задерживает сцену */}
       <Suspense fallback={null}>
         {posts.map((p) => (
@@ -382,14 +401,14 @@ function Marriage() {
   )
 }
 
-export function Assembly({ detailed = true }: { detailed?: boolean }) {
+export function Assembly({ detailed = true, onixRef }: { detailed?: boolean; onixRef?: RefObject<Group | null> }) {
   const simulated = useProductionEnabled()
   return (
     <group>
       <LineFurniture detailed={detailed} />
       {!simulated && <AssemblyCars />}
       <StageScope stage="qc"><QcStations /></StageScope>
-      {!simulated && <QcCars detailed={detailed} />}
+      {!simulated && <QcCars detailed={detailed} onixRef={onixRef} />}
     </group>
   )
 }

@@ -53,7 +53,7 @@ export function HallZones({
               <planeGeometry args={[u1 - u0, v1 - v0]} />
               <meshBasicMaterial color={z.color} transparent opacity={active ? 0.05 : 0} colorWrite={active} depthWrite={false} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-4} />
             </mesh>
-            <Line
+            {(active || labels) && <Line
               points={[
                 [u0, 0.08, -v0],
                 [u1, 0.08, -v0],
@@ -68,7 +68,7 @@ export function HallZones({
               polygonOffset
               polygonOffsetFactor={-2}
               polygonOffsetUnits={-4}
-            />
+            />}
             {tag && (labels || active || tag === 'Узкое место' || tag.startsWith('Простой')) && (
               <Label position={[(u0 + u1) / 2, labels ? 26 : 17, -(v0 + v1) / 2]} color={STATUS_COLOR[level!]} onClick={() => onSelect(z)}>
                 {z.short}: {tag}
@@ -136,7 +136,7 @@ function OutdoorZoneMark({
   )
   return (
     <group position={world(zone.center[0], zone.center[1])} rotation={[0, angle, 0]}>
-      <Line points={pts} color={zone.color} lineWidth={active ? 3.5 : 2} dashed={!active} dashSize={6} gapSize={4} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-4} />
+      {(active || labels) && <Line points={pts} color={zone.color} lineWidth={active ? 2 : 1} dashed={!active} dashSize={6} gapSize={4} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-4} />}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, 0.2, 0]}

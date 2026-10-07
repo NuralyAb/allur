@@ -12,18 +12,60 @@ import {
   type Material,
 } from 'three'
 import type { HallFrame, XY } from '../types'
-import { MAT, unitBox } from './assets'
+import { MAT, unitBox, unitCyl } from './assets'
 import { surfaceTile } from './surfaces'
 
 const glassWall = new MeshStandardMaterial({ color: '#859da9', metalness: 0.15, roughness: 0.18, transparent: true, opacity: 0.48, depthWrite: false })
 const skylight = new MeshStandardMaterial({ color: '#c2cbd0', roughness: 0.32, metalness: 0.12 })
 const concreteTexture = surfaceTile('concrete', 1 / 12)
 const roofTexture = surfaceTile('roof', 1 / 10)
-const epoxy = new MeshStandardMaterial({ color: '#b5bdbd', map: concreteTexture, bumpMap: concreteTexture, bumpScale: 0.025, roughness: 0.64, metalness: 0.04 })
-const roofFinish = new MeshStandardMaterial({ color: '#7c8b94', map: roofTexture, bumpMap: roofTexture, bumpScale: 0.055, roughness: 0.6, metalness: 0.32 })
+const epoxy = new MeshStandardMaterial({ color: '#9ea6a5', map: concreteTexture, bumpMap: concreteTexture, bumpScale: 0.018, roughness: 0.77, metalness: 0.025 })
+const roofFinish = new MeshStandardMaterial({ color: '#8d9899', map: roofTexture, bumpMap: roofTexture, bumpScale: 0.045, roughness: 0.73, metalness: 0.22 })
 const trim = new MeshStandardMaterial({ color: '#42525c', roughness: 0.52, metalness: 0.45 })
 const panelRib = new MeshStandardMaterial({ color: '#afb9bd', roughness: 0.68, metalness: 0.18 })
-const led = new MeshStandardMaterial({ color: '#f5f8fa', emissive: '#e7f0f7', emissiveIntensity: 1.7, toneMapped: false })
+const led = new MeshStandardMaterial({ color: '#dfe8e9', emissive: '#dfe8e9', emissiveIntensity: 0.55 })
+const servicePanel = new MeshStandardMaterial({ color: '#b9c0be', roughness: 0.72, metalness: 0.26 })
+const shutter = new MeshStandardMaterial({ color: '#647175', map: roofTexture, roughness: 0.69, metalness: 0.35 })
+
+type HallItem = { p: [number, number, number]; s: [number, number, number] }
+
+/** Roof services share geometry; their scale reads correctly in the site overview. */
+function RoofServices({ units, height }: { units: HallItem[]; height: number }) {
+  const fans = useMemo<HallItem[]>(() => units.flatMap(({ p }) => [-1.35, 1.35].map(x => ({ p: [p[0] + x, height + 2.08, p[2]], s: [1.35, 0.12, 1.35] }))), [units, height])
+  const louvers = useMemo<HallItem[]>(() => units.flatMap(({ p }) => Array.from({ length: 7 }, (_, i) => ({ p: [p[0], height + 0.66 + i * 0.18, p[2] + 1.62], s: [4.1, 0.055, 0.04] }))), [units, height])
+  const plinths = useMemo<HallItem[]>(() => units.map(({ p }) => ({ p: [p[0], height + 0.32, p[2]], s: [5.1, 0.35, 3.5] })), [units, height])
+  return <group>
+    <Instanced geometry={unitBox} material={trim} items={plinths} castShadow />
+    <Instanced geometry={unitBox} material={servicePanel} items={units} castShadow />
+    <Instanced geometry={unitCyl} material={trim} items={fans} />
+    <Instanced geometry={unitBox} material={trim} items={louvers} />
+  </group>
+}
+
+function FacadeBays({ length, height }: { length: number; height: number }) {
+  const details = useMemo(() => {
+    const doors: HallItem[] = [], frames: HallItem[] = [], ribs: HallItem[] = [], bollards: HallItem[] = []
+    for (let x = -length / 2 + 24; x < length / 2 - 18; x += 44) {
+      doors.push({ p: [x, 2.25, 0.28], s: [5.2, 4.5, 0.15] })
+      frames.push({ p: [x, 4.65, 0.46], s: [5.8, 0.28, 0.8] })
+      for (const side of [-1, 1]) {
+        frames.push({ p: [x + side * 2.8, 2.3, 0.38], s: [0.18, 4.6, 0.25] })
+        bollards.push({ p: [x + side * 3.15, 0.62, 1.1], s: [0.16, 1.24, 0.16] })
+      }
+      for (let y = 0.4; y < 4.4; y += 0.36) ribs.push({ p: [x, y, 0.365], s: [5.05, 0.035, 0.03] })
+    }
+    const mullions: HallItem[] = []
+    for (let x = -length / 2 + 5; x < length / 2 - 4; x += 6) mullions.push({ p: [x, height - 2.2, 0.3], s: [0.075, 1.45, 0.05] })
+    return { doors, frames, ribs, bollards, mullions }
+  }, [length, height])
+  return <group>
+    <Instanced geometry={unitBox} material={shutter} items={details.doors} />
+    <Instanced geometry={unitBox} material={trim} items={details.frames} castShadow />
+    <Instanced geometry={unitBox} material={panelRib} items={details.ribs} />
+    <Instanced geometry={unitBox} material={trim} items={details.mullions} />
+    <Instanced geometry={unitCyl} material={MAT.safety} items={details.bollards} castShadow />
+  </group>
+}
 
 function FactorySign() {
   const texture = useMemo(() => {
@@ -163,6 +205,7 @@ export function Hall({ frame, outline, roof }: Props) {
               <mesh geometry={unitBox} material={trim} scale={[w.len + 0.6, 0.32, 0.7]} position={[0, H + 0.45, 0]} castShadow />
               <mesh geometry={unitBox} material={trim} scale={[w.len, 0.14, 0.55]} position={[0, H - 3, 0]} />
               {w.len > 200 && <FactorySign />}
+              {w.len > 45 && <FacadeBays length={w.len} height={H} />}
             </>
           )}
         </group>
@@ -176,7 +219,7 @@ export function Hall({ frame, outline, roof }: Props) {
         <group>
           <mesh geometry={roofGeo} material={roofFinish} position={[0, H, 0]} castShadow receiveShadow />
           <Skylights frame={frame} />
-          <Instanced geometry={unitBox} material={trim} items={ventilation} castShadow />
+          <RoofServices units={ventilation} height={H} />
         </group>
       )}
     </group>

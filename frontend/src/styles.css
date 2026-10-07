@@ -232,6 +232,32 @@ h1 { font-size: 29px; line-height: 1.25; letter-spacing: -1.1px; margin: 0; font
 .live-event.done { opacity: .75; }
 @keyframes pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .live-pulse, .source-dot.live, .source-badge.live > span { animation: none; } }
+
+/* Let the model occupy most of the working area while keeping the shift data readable. */
+@media (min-width: 701px) {
+  .dashboard { padding-top: 18px; gap: 14px; }
+  .page-heading h1 { font-size: 26px; }
+  .page-heading p { margin-top: 5px; font-size: 10px; }
+  .page-eyebrow { margin-bottom: 5px; }
+  .metric { padding: 11px 14px; }
+  .metric-value { margin-top: 5px; font-size: 27px; }
+  .metric-bottom { margin-top: 7px; }
+}
+.scene-stage { box-shadow: 0 4px 24px #1f303607; }
+.scene-focused .dashboard > .page-heading,
+.scene-focused .dashboard > .kpis,
+.scene-focused .dashboard > .live-strip { display: none; }
+.scene-focused .scene-stage { flex: 1; min-height: 0; }
+.scene-focused .dashboard { overflow: hidden; }
+.tag { background: #f8fafaf0; color: #34454d; border-width: 0 0 0 3px; border-radius: 3px; box-shadow: 0 3px 12px #17233215; font-weight: 600; }
+.tag em { color: #75838a; }
+.tag-small { font-size: 9px; padding: 5px 9px; }
+@media (max-width: 700px) {
+  .stage-title { display: none; }
+  .stage-toolbar { gap: 5px; }
+  .scene-focused .scene-stage { min-height: 350px; }
+  .scene-focused .dashboard { padding-top: 10px; }
+}
 @media (max-width: 1200px) { .live-strip { grid-template-columns: 1fr; } .live-events { justify-content: flex-start; } .source-path { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 700px) { .live-areas { overflow-x: auto; } .source-row { flex-direction: column; align-items: stretch; } .source-actions { justify-content: flex-start; } .source-path { grid-template-columns: 1fr; } .source-current dl { gap: 14px; } }
 
@@ -338,3 +364,11 @@ h1 { font-size: 29px; line-height: 1.25; letter-spacing: -1.1px; margin: 0; font
 .sim-secondary { background: #fff; color: var(--text); border-color: #dfe3e9; }
 .sim-field input { background: #fff; color: var(--text); border-color: #dfe3e9; }
 .queue-track, .month-track { background: #e9edf2; }
+
+@media (max-width: 700px) {
+  .topbar { gap: 8px; }
+  .header-actions { flex-wrap: nowrap; gap: 6px; }
+  .header-actions .simulation-launch { flex: 0 1 auto; font-size: 9px; padding-inline: 8px; }
+  .header-actions .header-chart { display: none !important; }
+  .mobile-brand { font-size: 28px; white-space: nowrap; }
+}

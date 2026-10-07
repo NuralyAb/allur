@@ -1,7 +1,8 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import type { Group, Material, Mesh } from 'three'
 import { MAT } from './assets'
 import { CARS, vertexColored, type CarModelId } from './carModels'
+import { useVehicleFleet } from './VehicleFleet'
 
 export interface CarHandle {
   root: Group
@@ -35,10 +36,19 @@ export const Car = forwardRef<CarHandle, Props>(function Car(
 ) {
   const geo = CARS[model]
   const root = useRef<Group>(null!)
+  const fallback = useRef<Group>(null!)
+  const fleet = useVehicleFleet()
   const bodyRef = useRef<Mesh>(null!)
   const glassRef = useRef<Mesh>(null!)
   const wheelsRef = useRef<Group>(null!)
   const detailsRef = useRef<Mesh>(null!)
+
+  useLayoutEffect(() => {
+    if (!fleet) return
+    const vehicle = { model, root: root.current, fallback: fallback.current, body: bodyRef.current, glass: glassRef.current, wheels: wheelsRef.current, details: detailsRef.current }
+    fleet.vehicles.add(vehicle)
+    return () => { fleet.vehicles.delete(vehicle); vehicle.fallback.visible = true }
+  }, [fleet, model])
 
   useImperativeHandle(ref, () => ({
     root: root.current,
@@ -62,13 +72,15 @@ export const Car = forwardRef<CarHandle, Props>(function Car(
 
   return (
     <group ref={root} position={position} rotation={rotation}>
-      <mesh ref={bodyRef} geometry={geo.body} material={body} castShadow receiveShadow />
-      <mesh ref={glassRef} geometry={geo.glass} material={glass ?? MAT.glass} visible={!!glass} />
-      <mesh ref={detailsRef} geometry={geo.details} material={vertexColored} visible={details} />
-      <group ref={wheelsRef} visible={wheels}>
-        {geo.wheelPos.map((p, i) => (
-          <mesh key={i} geometry={geo.wheel} material={vertexColored} position={p} />
-        ))}
+      <group ref={fallback}>
+        <mesh ref={bodyRef} geometry={geo.body} material={body} castShadow receiveShadow />
+        <mesh ref={glassRef} geometry={geo.glass} material={glass ?? MAT.glass} visible={!!glass} />
+        <mesh ref={detailsRef} geometry={geo.details} material={vertexColored} visible={details} />
+        <group ref={wheelsRef} visible={wheels}>
+          {geo.wheelPos.map((p, i) => (
+            <mesh key={i} geometry={geo.wheel} material={vertexColored} position={p} />
+          ))}
+        </group>
       </group>
     </group>
   )

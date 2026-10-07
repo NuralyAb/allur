@@ -7,9 +7,18 @@
       "rotationY": -1.5707963267948966,
       "source": "https://sketchfab.com/3d-models/chevrolet-onix-bfd798c2695847b28ab681d42abc7056",
       "author": "uzb_rx7 (uzbek_supra)",
-      "license": "CC-BY-4.0"
+      "license": "CC-BY-4.0",
+      "lodUrl": "/models/onix-lod-dc9d722d84483a6b.glb"
     },
-    "cobalt": null,
+    "cobalt": {
+      "url": "/models/cobalt-9ae8e2ee03cdccd9.glb",
+      "length": 4.479,
+      "rotationY": -1.5707963267948966,
+      "source": "https://sketchfab.com/3d-models/chevrolet-cobalt-ltz-2014-f91cbef731444f939e263041400216ca",
+      "author": "Q.SARDOR (qsardor57913)",
+      "license": "CC-BY-4.0",
+      "lodUrl": "/models/cobalt-lod-79e630240cf5d23e.glb"
+    },
     "j7": null
   },
   "conveyor": null
