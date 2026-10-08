@@ -20,7 +20,7 @@ export function ZonePanel({ plant, kpi, insights, selection, onClose, onDecision
       </div>
       <div className="zonepanel-content">
         <p className="zp-desc">{z.description}</p>
-        {area && area.length > 0 && <AreaKpi rows={area} kpi={kpi} />}
+        {area && area.length > 0 && <AreaKpi rows={area} kpi={kpi} insights={insights} area={selection.kind === 'zone' ? selection.zone.kpiArea : undefined} />}
         {selection.kind === 'zone' && selection.zone.kpiArea && (!area || area.length === 0) && <p className="empty-state">Производственные показатели этого участка пока не представлены в исходных данных.</p>}
         {selection.kind === 'zone' && selection.zone.kpiArea && <AreaAlerts area={selection.zone.kpiArea} insights={insights} onDecisions={onDecisions} />}
         {selection.kind === 'zone' && <ZoneControllers zone={selection.zone.id} />}
@@ -59,15 +59,20 @@ function AreaAlerts({ area, insights, onDecisions }: { area: string; insights: I
   )
 }
 
-function AreaKpi({ rows, kpi }: { rows: LineRow[]; kpi: Kpi }) {
+function AreaKpi({ rows, kpi, insights, area }: { rows: LineRow[]; kpi: Kpi; insights: Insights; area?: string | null }) {
   const last = [...rows].sort((a, b) => a.date.localeCompare(b.date))[rows.length - 1]
   const t = kpi.targets
+  // годные за смену — та же величина, что в центре решений: среднее за окно расчёта без брака
+  const flow = insights.flow.find((f) => f.area === area)
+  const bottleneck = area === insights.base.bottleneck
   return (
     <section className="panel-section">
       <div className="section-heading"><h3 className="panel-caption">Показатели участка</h3><span className="section-meta">{fmtDate(last.date)}</span></div>
       <p className="section-meta">{last.line} · данные кейса</p>
       <div className="kpi-grid">
-        <Tile label="Факт / план" value={`${num(last.fact)} / ${num(last.plan)}`} status={last.fact >= last.plan ? 'ok' : 'warn'} sub={last.fact >= last.plan ? 'план выполнен' : `до плана ${num(last.plan - last.fact)} авто`} />
+        {flow
+          ? <Tile label="Годных за смену / план" value={`${num(flow.good)} / ${num(flow.plan)}`} status={flow.good >= flow.plan ? 'ok' : bottleneck ? 'bad' : 'warn'} sub={bottleneck ? 'узкое место · без брака' : 'без брака · среднее'} />
+          : <Tile label="Факт / план" value={`${num(last.fact)} / ${num(last.plan)}`} status={last.fact >= last.plan ? 'ok' : 'warn'} sub={last.fact >= last.plan ? 'план выполнен' : `до плана ${num(last.plan - last.fact)} авто`} />}
         <Tile label="Загрузка" value={`${num(last.load)}%`} status="neutral" sub="по исходным данным" />
         <Tile label="Условный OEE" value={`${num(last.oee)}%`} status={last.oee >= t.oee ? 'ok' : 'bad'} sub={`демо · цель ≥ ${t.oee}%`} />
         <Tile label="Брак" value={`${num(last.defectRate)}%`} status={last.defectRate <= t.defect ? 'ok' : 'bad'} sub={`норма ≤ ${t.defect}%`} />
