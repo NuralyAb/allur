@@ -12,6 +12,7 @@ import { makePath, mod, placeOnPath, type P3 } from './motion'
 import { pickModel } from './carModels'
 import { ParkedCars, type ParkedCar } from './ParkedCars'
 import { surfaceTile } from './surfaces'
+import { OUTBOUND_ROUTE, ROAD_TURN_RADIUS } from './exteriorLayout'
 
 type Item = { p: [number, number, number]; s: [number, number, number]; r?: number }
 
@@ -197,16 +198,7 @@ function TestTrack({ zone }: { zone: OutdoorZone }) {
 /** Готовые машины выезжают из ворот ОТК (юго-западная стена) и объезжают корпус к площадке отгрузки. */
 function Outbound({ frame }: { frame: HallFrame }) {
   const path = useMemo(() => {
-    const pts: [number, number][] = [
-      [157, -8],
-      [157, -40],
-      [385, -40],
-      [388, 300],
-      [372, 318],
-      [200, 330],
-      [160, 345],
-    ]
-    return makePath(pts.map(([u, v]) => hallToWorld(frame, u, v).toArray() as P3), 8)
+    return makePath(OUTBOUND_ROUTE.map(([u, v]) => hallToWorld(frame, u, v).toArray() as P3), ROAD_TURN_RADIUS)
   }, [frame])
   const len = useMemo(() => path.getLength(), [path])
   const refs = useRef<(CarHandle | null)[]>([])

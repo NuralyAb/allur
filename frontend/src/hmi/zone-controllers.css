@@ -1,0 +1,24 @@
+/* Блок ПЛК в карточке участка цифрового двойника. Стили приоритетов и состояний — те же, что в пульте HMI. */
+.zc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.zc-head .panel-caption { margin: 0 0 10px; }
+.zc-source { font-size: 9px; color: var(--muted); }
+.zc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.zc-list a { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 9px 11px; border: 1px solid #e5eaf0; border-radius: 7px; background: #fafbfc; color: inherit; text-decoration: none; }
+.zc-list a:hover { border-color: #aebed0; background: #fff; }
+.zc-name b { display: block; font-size: 11px; }
+.zc-name small { display: block; font-size: 9px; color: var(--muted); line-height: 1.5; }
+.zc-alarm { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: 6px; font-size: 10px; color: #4d5866; font-weight: 600; }
+.zc-open { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 10px; padding: 10px; border-radius: 7px; border: 1px solid #dfe5ed; background: #f8fafc; font-size: 10px; color: #526981; text-decoration: none; font-weight: 600; }
+.zc-open:hover { background: #eef2f7; }
+.zc .state-chip { display: inline-flex; padding: 3px 7px; border-radius: 4px; font-size: 9px; font-weight: 700; white-space: nowrap; border: 1px solid #d5dbe3; color: #66717f; background: #fff; }
+.zc .state-chip.run { background: #3d4a59; border-color: #3d4a59; color: #fff; }
+.zc .state-chip.wait { border-style: dashed; color: #3a4552; }
+.zc .state-chip.fault { background: #c62a1f; border-color: #c62a1f; color: #fff; }
+.zc .state-chip.comm-bad { border: 1px dashed #8a3fa0; color: #5d2470; background: #f6edf8; }
+.zc .prio { display: inline-grid; place-items: center; width: 16px; height: 16px; flex-shrink: 0; font-size: 9px; font-weight: 800; color: #fff; }
+.zc .prio.prio-1 { background: #c62a1f; border-radius: 2px; }
+.zc .prio.prio-2 { background: #d9770b; clip-path: polygon(50% 0, 100% 100%, 0 100%); padding-top: 4px; width: 18px; height: 17px; }
+.zc .prio.prio-3 { background: #e2bb00; border-radius: 50%; color: #3b3000; }
+.zc .prio.unacked { animation: zc-blink 1s steps(2, start) infinite; }
+@keyframes zc-blink { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .zc .prio.unacked { animation: none; outline: 2px solid #1d2530; outline-offset: 1px; } }

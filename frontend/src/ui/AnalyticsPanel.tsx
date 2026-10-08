@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Kpi } from '../types'
 import { Icon } from './Icon'
+import './WorkspacePanel.css'
 
 const dateLabel = (value: string) => value.split('-').reverse().join('.')
 const num = (value: number) => value.toLocaleString('ru-RU')
 
 export function AnalyticsPanel({ kpi, onClose, onArea }: { kpi: Kpi; onClose: () => void; onArea: (area: string) => void }) {
-  const ref = useRef<HTMLDialogElement>(null!)
   const [date, setDate] = useState('all')
   const dates = [...new Set(kpi.rows.map((r) => r.date))].sort()
   const rows = kpi.rows.filter((r) => date === 'all' || r.date === date)
@@ -15,19 +15,17 @@ export function AnalyticsPanel({ kpi, onClose, onArea }: { kpi: Kpi; onClose: ()
   const period = dates.length ? [dates[0], dates.length > 1 ? dates[dates.length - 1] : null].filter(Boolean).map((d) => dateLabel(d!)).join(' — ') : 'Период не указан'
 
   useEffect(() => {
-    const dialog = ref.current
-    dialog.showModal()
-    return () => dialog.close()
+    document.getElementById('analytics-title')?.focus({ preventScroll: true })
   }, [])
 
   return (
-    <dialog ref={ref} className="analytics-dialog" aria-labelledby="analytics-title" onCancel={onClose}>
+    <section className="workspace-panel analytics-dialog" aria-labelledby="analytics-title">
       <div className="analytics-heading">
         <div className="panel-title-row">
           <span className="panel-heading-icon"><Icon name="chart" /></span>
-          <div><span className="panel-eyebrow">Производство / Аналитика</span><h2 id="analytics-title">Производственная аналитика</h2><p>{kpi.meta.demo ? 'Данные демонстрационного кейса' : 'Производственные данные'} · {period}</p></div>
+          <div><span className="panel-eyebrow">Производство / Аналитика</span><h1 id="analytics-title" tabIndex={-1}>Производственная аналитика</h1><p>{kpi.meta.demo ? 'Данные демонстрационного кейса' : 'Производственные данные'} · {period}</p></div>
         </div>
-        <button type="button" className="analytics-close" onClick={onClose} aria-label="Закрыть аналитику" autoFocus><Icon name="close" /></button>
+        <button type="button" className="workspace-back" onClick={onClose} aria-label="Вернуться к заводу"><Icon name="arrow-left" size={16} />К заводу</button>
       </div>
       <div className="analytics-body">
         <div className="data-notice"><Icon name="info" /><p>Сводка выпуска и качества — по Сборке-1. Данные приёмки ОТК и текущие состояния оборудования не предоставлены. Анимация 3D иллюстрирует процесс.</p></div>
@@ -72,6 +70,6 @@ export function AnalyticsPanel({ kpi, onClose, onArea }: { kpi: Kpi; onClose: ()
         </section>
         <details className="analytics-method"><summary>Источник данных и методика расчёта</summary><p>{kpi.meta.source}</p><ul>{kpi.meta.methodology.map((text) => <li key={text}>{text}</li>)}</ul></details>
       </div>
-    </dialog>
+    </section>
   )
 }

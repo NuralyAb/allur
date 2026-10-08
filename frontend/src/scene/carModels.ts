@@ -288,6 +288,23 @@ function wheelGeoFor(r: number) {
   return mergeGeometries(parts)!
 }
 
+/** Колесо для дальних стоящих машин: шина и диск без спиц и ободов — ~60 треугольников вместо ~1 500. */
+function wheelLowGeoFor(r: number) {
+  const tinted = (geometry: BufferGeometry, color: string) => {
+    const g = geometry.toNonIndexed()
+    const c = new Color(color)
+    const n = g.getAttribute('position').count
+    const colors = new Float32Array(n * 3)
+    for (let i = 0; i < n; i++) colors.set([c.r, c.g, c.b], i * 3)
+    g.setAttribute('color', new Float32BufferAttribute(colors, 3))
+    return g
+  }
+  return mergeGeometries([
+    tinted(new CylinderGeometry(r * 0.96, r * 0.96, 0.18, 10).rotateX(Math.PI / 2), '#101215'),
+    tinted(new CylinderGeometry(r * 0.55, r * 0.55, 0.2, 8, 1, true).rotateX(Math.PI / 2), '#8d949b'),
+  ])!
+}
+
 export interface CarGeometry {
   spec: Spec
   body: BufferGeometry
@@ -298,6 +315,8 @@ export interface CarGeometry {
   wheelPos: [number, number, number][]
   /** все четыре колеса одной геометрией — для стоящих машин */
   wheelsMerged: BufferGeometry
+  /** то же в упрощённом виде — для стоянок, где вблизи машины заменяет GLB-модель */
+  wheelsMergedLow: BufferGeometry
 }
 
 function build(id: CarModelId): CarGeometry {
@@ -316,7 +335,9 @@ function build(id: CarModelId): CarGeometry {
     [xr, s.wheelR, -zw],
   ]
   const wheelsMerged = mergeGeometries(wheelPos.map((p) => wheel.clone().translate(...p)))!
-  return { spec: s, body, glass, details, wheel, wheelPos, wheelsMerged }
+  const wheelLow = wheelLowGeoFor(s.wheelR)
+  const wheelsMergedLow = mergeGeometries(wheelPos.map((p) => wheelLow.clone().translate(...p)))!
+  return { spec: s, body, glass, details, wheel, wheelPos, wheelsMerged, wheelsMergedLow }
 }
 
 export const CARS: Record<CarModelId, CarGeometry> = {

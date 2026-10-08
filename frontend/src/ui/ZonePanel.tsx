@@ -1,5 +1,6 @@
 import type { Insights, Kpi, LineRow, Plant, Selection } from '../types'
 import { Icon } from './Icon'
+import { ZoneControllers } from '../hmi/ZoneControllers'
 
 const fmtDate = (d: string) => d.slice(8, 10) + '.' + d.slice(5, 7)
 const num = (value: number) => value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })
@@ -22,6 +23,7 @@ export function ZonePanel({ plant, kpi, insights, selection, onClose, onDecision
         {area && area.length > 0 && <AreaKpi rows={area} kpi={kpi} />}
         {selection.kind === 'zone' && selection.zone.kpiArea && (!area || area.length === 0) && <p className="empty-state">Производственные показатели этого участка пока не представлены в исходных данных.</p>}
         {selection.kind === 'zone' && selection.zone.kpiArea && <AreaAlerts area={selection.zone.kpiArea} insights={insights} onDecisions={onDecisions} />}
+        {selection.kind === 'zone' && <ZoneControllers zone={selection.zone.id} />}
         {z.facts.length > 0 && (
           <section className="panel-section">
             <h3 className="panel-caption">Об участке</h3>

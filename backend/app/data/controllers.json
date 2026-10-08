@@ -1,0 +1,193 @@
+{
+  "about": "Реестр контроллеров SCADA. На заводе интегратор указывает адрес OPC UA-сервера ПЛК или шлюза (connections), путь к PackML-интерфейсу каждого ПЛК (path) и при необходимости сопоставление тегов с адресами ПЛК (map: суффикс тега -> NodeId). Блок sim описывает только поведение симулятора.",
+  "writeEnabled": true,
+  "commonFaults": {
+    "900": "Разомкнута цепь безопасности (аварийная кнопка или ограждение)",
+    "910": "Аварийная остановка подана со SCADA"
+  },
+  "connections": [
+    {
+      "id": "line",
+      "name": "OPC UA-шлюз линий",
+      "protocol": "opcua",
+      "endpoint": "opc.tcp://127.0.0.1:4840/allur/plcsim",
+      "namespace": "urn:allur:plcsim",
+      "security": null,
+      "user": null,
+      "passwordEnv": null,
+      "publishingMs": 250
+    }
+  ],
+  "lines": [
+    {"id": "main", "name": "Главная линия: сварка → катафорез → печь → окраска → сборка → ОТК",
+     "controllers": ["abb-01", "ed-10", "oven-01", "booth-02", "conveyor-03", "brake-01"],
+     "bufferSeconds": [120, 60, 90, 150, 60]}
+  ],
+  "controllers": [
+    {
+      "id": "abb-01", "equipment": "ABB-01", "name": "Робот точечной сварки ABB-01", "zone": "welding", "area": "Сварка",
+      "connection": "line", "path": "Welding.ABB01",
+      "speed": {"value": 18.75, "min": 12, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "params": [
+        {"id": "WeldCurrent", "name": "Ток сварки", "unit": "кА", "decimals": 2, "range": [0, 14], "nominal": 9.5, "ambient": 0, "tau": 1, "noise": 0.12,
+         "alarms": {"lo": 8.5, "hi": 10.5}},
+        {"id": "TipWear", "name": "Износ электродов", "unit": "%", "decimals": 0, "range": [0, 100], "start": 58, "drift": 0.6,
+         "alarms": {"hi": 80, "hihi": 92}, "trip": {"above": 98, "code": 102}, "resetTo": 5},
+        {"id": "CoolantFlow", "name": "Расход охлаждения", "unit": "л/мин", "decimals": 1, "range": [0, 12], "nominal": 8, "ambient": 0, "active": "on", "tau": 2, "noise": 0.15,
+         "alarms": {"lo": 6, "lolo": 4}, "trip": {"below": 3, "code": 103}}
+      ],
+      "faults": {"101": "Ошибка датчика", "102": "Износ электродов: требуется замена колпачков", "103": "Нет охлаждения сварочных клещей"},
+      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.022}
+    },
+    {
+      "id": "abb-02", "equipment": "ABB-02", "name": "Робот точечной сварки ABB-02", "zone": "welding", "area": "Сварка",
+      "connection": "line", "path": "Welding.ABB02",
+      "speed": {"value": 18.75, "min": 12, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "params": [
+        {"id": "WeldCurrent", "name": "Ток сварки", "unit": "кА", "decimals": 2, "range": [0, 14], "nominal": 9.2, "ambient": 0, "tau": 1, "noise": 0.12,
+         "alarms": {"lo": 8.2, "hi": 10.2}},
+        {"id": "TipWear", "name": "Износ электродов", "unit": "%", "decimals": 0, "range": [0, 100], "start": 31, "drift": 0.5,
+         "alarms": {"hi": 80, "hihi": 92}, "trip": {"above": 98, "code": 102}, "resetTo": 5}
+      ],
+      "faults": {"101": "Ошибка датчика", "102": "Износ электродов: требуется замена колпачков"},
+      "sim": {"state": 6, "mode": 1, "remote": false, "defectRate": 0.02}
+    },
+    {
+      "id": "abb-04", "equipment": "ABB-04", "name": "Робот точечной сварки ABB-04", "zone": "welding", "area": "Сварка",
+      "connection": "line", "path": "Welding.ABB04",
+      "speed": {"value": 18.75, "min": 12, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "params": [
+        {"id": "WeldCurrent", "name": "Ток сварки", "unit": "кА", "decimals": 2, "range": [0, 14], "nominal": 9.4, "ambient": 0, "tau": 1, "noise": 0.12,
+         "alarms": {"lo": 8.4, "hi": 10.4}},
+        {"id": "TipWear", "name": "Износ электродов", "unit": "%", "decimals": 0, "range": [0, 100], "start": 4, "drift": 0.5,
+         "alarms": {"hi": 80, "hihi": 92}, "trip": {"above": 98, "code": 102}, "resetTo": 5}
+      ],
+      "faults": {"101": "Ошибка датчика", "102": "Износ электродов: требуется замена колпачков", "104": "Плановое ТО"},
+      "sim": {"state": 2, "mode": 2, "remote": true, "stopReason": 104, "defectRate": 0.02}
+    },
+    {
+      "id": "laser-01", "equipment": "Лазер-01", "name": "Ячейка лазерной сварки крыши Onix (8 роботов)", "zone": "welding", "area": "Сварка",
+      "connection": "line", "path": "Welding.Laser01",
+      "speed": {"value": 18, "min": 12, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "params": [
+        {"id": "LaserPower", "name": "Мощность лазера", "unit": "кВт", "decimals": 2, "range": [0, 6], "sp": {"value": 4.0, "min": 3.0, "max": 5.0, "maxStep": 0.3},
+         "ambient": 0, "tau": 0.5, "noise": 0.03, "alarms": {"dev": 0.25}},
+        {"id": "ShieldGas", "name": "Расход защитного газа", "unit": "л/мин", "decimals": 1, "range": [0, 40], "nominal": 20, "ambient": 0, "tau": 1, "noise": 0.4,
+         "alarms": {"lo": 15, "lolo": 12}},
+        {"id": "OpticsTemp", "name": "Температура оптики", "unit": "°C", "decimals": 1, "range": [0, 80], "nominal": 32, "ambient": 24, "tau": 30, "noise": 0.2,
+         "alarms": {"hi": 45, "hihi": 55}, "trip": {"above": 60, "code": 106}}
+      ],
+      "faults": {"105": "Загрязнение защитного стекла", "106": "Перегрев оптики"},
+      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.008}
+    },
+    {
+      "id": "ed-10", "equipment": "Ванна-10", "name": "Ванна катафорезного грунтования №10", "zone": "paint", "area": "Окраска",
+      "connection": "line", "path": "Paint.ED10",
+      "speed": {"value": 18.75, "min": 14, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "params": [
+        {"id": "BathTemp", "name": "Температура ванны", "unit": "°C", "decimals": 1, "range": [10, 45], "sp": {"value": 32, "min": 28, "max": 34, "maxStep": 1},
+         "ambient": 22, "active": "on", "tau": 40, "noise": 0.1, "alarms": {"dev": 1.5, "hihi": 36}, "trip": {"above": 38, "code": 203}},
+        {"id": "Voltage", "name": "Напряжение осаждения", "unit": "В", "decimals": 0, "range": [0, 400], "sp": {"value": 260, "min": 200, "max": 300, "maxStep": 10},
+         "ambient": 0, "tau": 2, "noise": 1.5, "alarms": {"dev": 15}},
+        {"id": "Conductivity", "name": "Электропроводность", "unit": "мкСм/см", "decimals": 0, "range": [0, 2500], "start": 1420, "drift": 1.5, "active": "on", "noise": 6,
+         "alarms": {"hi": 1600, "hihi": 1750}}
+      ],
+      "faults": {"203": "Перегрев ванны", "204": "Отказ выпрямителя"},
+      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.01}
+    },
+    {
+      "id": "oven-01", "equipment": "Печь-01", "name": "Печь сушки катафорезного грунта", "zone": "paint", "area": "Окраска",
+      "connection": "line", "path": "Paint.Oven01",
+      "speed": {"value": 18.75, "min": 14, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "params": [
+        {"id": "Temp", "name": "Температура зоны выдержки", "unit": "°C", "decimals": 0, "range": [0, 250], "sp": {"value": 180, "min": 160, "max": 200, "maxStep": 10},
+         "ambient": 25, "active": "on", "tau": 45, "noise": 0.6, "alarms": {"dev": 8, "hihi": 205}, "trip": {"above": 215, "code": 205},
+         "permissive": {"command": "START", "belowSp": 10, "text": "Печь не прогрета"}},
+        {"id": "Burner", "name": "Нагрузка горелок", "unit": "%", "decimals": 0, "range": [0, 100], "nominal": 46, "ambient": 0, "active": "on", "tau": 5, "noise": 1.2,
+         "alarms": {"hi": 90}}
+      ],
+      "faults": {"205": "Перегрев печи", "206": "Погасание пламени горелки"},
+      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.004}
+    },
+    {
+      "id": "booth-01", "equipment": "Камера-01", "name": "Камера нанесения грунта", "zone": "paint", "area": "Окраска",
+      "connection": "line", "path": "Paint.Booth01",
+      "speed": {"value": 18.75, "min": 14, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "params": [
+        {"id": "Temp", "name": "Температура воздуха", "unit": "°C", "decimals": 1, "range": [10, 35], "sp": {"value": 23, "min": 19, "max": 27, "maxStep": 2},
+         "ambient": 18, "active": "on", "tau": 30, "noise": 0.12, "alarms": {"dev": 1.5}},
+        {"id": "Humidity", "name": "Влажность воздуха", "unit": "%", "decimals": 0, "range": [30, 90], "sp": {"value": 65, "min": 55, "max": 75, "maxStep": 5},
+         "ambient": 45, "active": "on", "tau": 40, "noise": 0.4, "alarms": {"dev": 5}},
+        {"id": "FilterDp", "name": "Перепад давления на фильтре", "unit": "Па", "decimals": 0, "range": [0, 400], "start": 118, "drift": 1.2, "noise": 1.5,
+         "alarms": {"hi": 220, "hihi": 260}, "trip": {"above": 285, "code": 201}, "resetTo": 110}
+      ],
+      "faults": {"201": "Замена фильтра", "202": "Засор форсунки"},
+      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.02}
+    },
+    {
+      "id": "booth-02", "equipment": "Камера-02", "name": "Камера окраски базой и лаком", "zone": "paint", "area": "Окраска",
+      "connection": "line", "path": "Paint.Booth02",
+      "speed": {"value": 18.75, "min": 14, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "params": [
+        {"id": "Temp", "name": "Температура воздуха", "unit": "°C", "decimals": 1, "range": [10, 35], "sp": {"value": 23, "min": 19, "max": 27, "maxStep": 2},
+         "ambient": 18, "active": "on", "tau": 30, "noise": 0.12, "alarms": {"dev": 1.5}},
+        {"id": "Humidity", "name": "Влажность воздуха", "unit": "%", "decimals": 0, "range": [30, 90], "sp": {"value": 65, "min": 55, "max": 75, "maxStep": 5},
+         "ambient": 45, "active": "on", "tau": 40, "noise": 0.4, "alarms": {"dev": 5}},
+        {"id": "FilterDp", "name": "Перепад давления на фильтре", "unit": "Па", "decimals": 0, "range": [0, 400], "start": 196, "drift": 2.5, "noise": 1.5,
+         "alarms": {"hi": 220, "hihi": 260}, "trip": {"above": 285, "code": 201}, "resetTo": 110}
+      ],
+      "faults": {"201": "Замена фильтра", "202": "Засор форсунки"},
+      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.043}
+    },
+    {
+      "id": "conveyor-03", "equipment": "Конвейер-03", "name": "Главный сборочный конвейер (59 постов)", "zone": "assembly", "area": "Сборка",
+      "connection": "line", "path": "Assembly.Conveyor03",
+      "speed": {"value": 16.7, "min": 12, "max": 18, "maxStep": 1.5, "unit": "авто/ч"},
+      "params": [
+        {"id": "ChainTension", "name": "Натяжение цепи", "unit": "кН", "decimals": 1, "range": [0, 25], "start": 13.4, "drift": 0.08, "noise": 0.15,
+         "alarms": {"hi": 16, "hihi": 18}, "trip": {"above": 19.5, "code": 301}, "resetTo": 12},
+        {"id": "MotorCurrent", "name": "Ток привода", "unit": "А", "decimals": 1, "range": [0, 80], "nominal": 42, "ambient": 0, "tau": 2, "noise": 0.8,
+         "alarms": {"hi": 58, "hihi": 65}, "trip": {"above": 70, "code": 302}}
+      ],
+      "faults": {"301": "Обрыв цепи", "302": "Перегрузка привода"},
+      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.012}
+    },
+    {
+      "id": "nutrunner-07", "equipment": "Гайковёрт-07", "name": "Гайковёрт колёс, 5 шпинделей", "zone": "assembly", "area": "Сборка",
+      "connection": "line", "path": "Assembly.Nutrunner07",
+      "speed": {"value": 16.7, "unit": "авто/ч"},
+      "params": [
+        {"id": "Torque", "name": "Момент затяжки", "unit": "Н·м", "decimals": 0, "range": [0, 200], "sp": {"value": 110, "min": 100, "max": 130, "maxStep": 5},
+         "ambient": 0, "tau": 0.3, "noise": 1.5, "alarms": {"dev": 6}}
+      ],
+      "faults": {"401": "Отказ инструмента", "402": "Затяжка вне допуска (NOK)"},
+      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.005}
+    },
+    {
+      "id": "brake-01", "equipment": "Стенд-01", "name": "Тормозной стенд ОТК", "zone": "qc", "area": "ОТК",
+      "connection": "line", "path": "QC.Brake01",
+      "speed": {"value": 17, "unit": "авто/ч"},
+      "params": [
+        {"id": "RollerSpeed", "name": "Скорость роликов", "unit": "км/ч", "decimals": 2, "range": [0, 10], "nominal": 5, "ambient": 0, "tau": 1, "noise": 0.04,
+         "alarms": {"lo": 4.5}},
+        {"id": "MotorTemp", "name": "Температура двигателей", "unit": "°C", "decimals": 1, "range": [0, 120], "nominal": 58, "ambient": 22, "tau": 120, "noise": 0.3,
+         "alarms": {"hi": 80, "hihi": 95}, "trip": {"above": 100, "code": 502}}
+      ],
+      "faults": {"501": "Отказ датчика тормозной силы", "502": "Перегрев двигателей роликов"},
+      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.017}
+    },
+    {
+      "id": "rain-01", "equipment": "Дождь-01", "name": "Дождевальная камера (проверка герметичности)", "zone": "qc", "area": "ОТК",
+      "connection": "line", "path": "QC.Rain01",
+      "speed": {"value": 17, "unit": "авто/ч"},
+      "params": [
+        {"id": "WaterPressure", "name": "Давление воды", "unit": "бар", "decimals": 2, "range": [0, 4], "sp": {"value": 2.0, "min": 1.5, "max": 3.0, "maxStep": 0.3},
+         "ambient": 0, "tau": 3, "noise": 0.02, "alarms": {"dev": 0.25}},
+        {"id": "TankLevel", "name": "Уровень в баке", "unit": "%", "decimals": 0, "range": [0, 100], "nominal": 78, "ambient": 78, "active": "on", "tau": 60, "noise": 0.3,
+         "alarms": {"lo": 40, "lolo": 25}}
+      ],
+      "faults": {"601": "Отказ насоса"},
+      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.0}
+    }
+  ]
+}

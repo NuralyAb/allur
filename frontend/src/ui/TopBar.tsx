@@ -4,20 +4,20 @@ import { Icon, type IconName } from './Icon'
 
 export const fmtDate = (d: string) => d.split('-').reverse().join('.')
 
-export function TopBar({ plant, kpi, sourceLabel, live, navigation, onNavigation, onAnalytics, onDecisions, onSource, simulationMode, connected, busy, onSimulation }: { plant: Plant; kpi: Kpi; insights: Insights; sourceLabel: string; live: boolean; navigation: boolean; onNavigation: () => void; onAnalytics: () => void; onDecisions: () => void; onSource: () => void; simulationMode: boolean; connected: boolean; busy: boolean; onSimulation: () => void }) {
+export function TopBar({ sectionTitle, factoryView, plant, kpi, sourceLabel, live, navigation, onNavigation, onAnalytics, onDecisions, onSource, simulationMode, connected, busy, onSimulation }: { sectionTitle: string; factoryView: boolean; plant: Plant; kpi: Kpi; insights: Insights; sourceLabel: string; live: boolean; navigation: boolean; onNavigation: () => void; onAnalytics: () => void; onDecisions: () => void; onSource: () => void; simulationMode: boolean; connected: boolean; busy: boolean; onSimulation: () => void }) {
   return (
     <header className="topbar" inert={navigation}>
       <div className="header-context">
-        <button className="icon-button navigation-toggle" aria-label="Открыть участки завода" aria-expanded={navigation} aria-controls="plant-navigation" onClick={onNavigation}><Icon name="menu" /></button>
+        <button className="icon-button navigation-toggle" aria-label="Открыть навигацию" aria-expanded={navigation} aria-controls="plant-navigation" onClick={onNavigation}><Icon name="menu" /></button>
         <span className="mobile-brand brand-logo">allur<span>®</span></span>
-        <span className="breadcrumb">Рабочее пространство <Icon name="chevron-right" size={13} /><strong>Цифровой двойник</strong></span>
+        <span className="breadcrumb">Рабочее пространство <Icon name="chevron-right" size={13} /><strong>{sectionTitle}</strong></span>
       </div>
       <div className="header-actions">
         <span className="location-label" title={plant.address}><Icon name="pin" size={14} />Костанай, Казахстан</span>
         {simulationMode
           ? <span className="demo-badge"><span />{connected ? 'Сценарный поток' : 'Сценарий · HTTP'}</span>
           : <button className={`demo-badge source-badge${live ? ' live' : ''}`} onClick={onSource} title="Источник данных: загрузка, live, шаблон"><span />{sourceLabel}</button>}
-        <button className={`simulation-launch${simulationMode ? ' active' : ''}`} disabled={busy} aria-pressed={simulationMode} onClick={onSimulation}><Icon name={simulationMode ? 'arrow-left' : 'play'} size={14} />{simulationMode ? 'Вернуться к обзору' : 'Сценарии производства'}</button>
+        <button className={`simulation-launch${simulationMode ? ' active' : ''}`} disabled={busy} aria-pressed={simulationMode} onClick={onSimulation}><Icon name={simulationMode ? 'arrow-left' : 'play'} size={14} />{simulationMode ? (factoryView ? 'Вернуться к обзору' : 'К сценарию') : 'Сценарии производства'}</button>
         <button className="icon-button header-chart" onClick={onAnalytics} aria-label={simulationMode ? 'Данные кейса' : 'Данные и аналитика'}><Icon name="chart" /></button>
         <button className="icon-button" onClick={onDecisions} aria-label={`Центр решений · данные за ${fmtDate(kpi.date)}`} title="Центр решений"><Icon name="layers" /></button>
       </div>

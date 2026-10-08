@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { runScenario } from '../api'
 import type { Insights, ScenarioResult } from '../types'
 import { Icon } from './Icon'
+import './WorkspacePanel.css'
 
 const num = (x: number) => x.toLocaleString('ru-RU', { maximumFractionDigits: 1 })
 const signed = (x: number) => (x > 0 ? '+' : x < 0 ? '−' : '') + num(Math.abs(x))
@@ -9,7 +10,6 @@ const tenge = (x: number) => `${(x / 1e9).toLocaleString('ru-RU', { maximumFract
 const RISK = { high: 'Высокий', medium: 'Средний', low: 'Низкий' }
 
 export function DecisionsPanel({ insights, onClose, onArea }: { insights: Insights; onClose: () => void; onArea: (area: string) => void }) {
-  const ref = useRef<HTMLDialogElement>(null!)
   const base = insights.base
   const [levers, setLevers] = useState<string[]>([])
   const [shifts, setShifts] = useState(base.shifts)
@@ -30,9 +30,7 @@ export function DecisionsPanel({ insights, onClose, onArea }: { insights: Insigh
   const validInputs = validDays && validExtraShifts
 
   useEffect(() => {
-    const dialog = ref.current
-    dialog.showModal()
-    return () => dialog.close()
+    document.getElementById('decisions-title')?.focus({ preventScroll: true })
   }, [])
 
   useEffect(() => {
@@ -59,13 +57,13 @@ export function DecisionsPanel({ insights, onClose, onArea }: { insights: Insigh
   const stale = loading || !!error || !validInputs
 
   return (
-    <dialog ref={ref} className="analytics-dialog decisions" aria-labelledby="decisions-title" onCancel={onClose}>
+    <section className="workspace-panel analytics-dialog decisions decisions-dialog" aria-labelledby="decisions-title">
       <div className="analytics-heading">
         <div className="panel-title-row">
           <span className="panel-heading-icon"><Icon name="target" /></span>
-          <div><span className="panel-eyebrow">Производство / Планирование</span><h2 id="decisions-title">Центр решений</h2><p>Найдите ограничения и оцените эффект изменений на выпуск месяца.</p></div>
+          <div><span className="panel-eyebrow">Производство / Планирование</span><h1 id="decisions-title" tabIndex={-1}>Центр решений</h1><p>Найдите ограничения и оцените эффект изменений на выпуск месяца.</p></div>
         </div>
-        <button type="button" className="analytics-close" onClick={onClose} aria-label="Закрыть центр решений" autoFocus><Icon name="close" /></button>
+        <button type="button" className="workspace-back" onClick={onClose} aria-label="Вернуться к заводу"><Icon name="arrow-left" size={16} />К заводу</button>
       </div>
       <div className="analytics-body">
         <div className="data-notice"><Icon name="info" /><p>Сценарный расчёт по данным кейса. Прогноз зависит от заданных смен, рабочих дней и допущений модели.</p></div>
@@ -149,6 +147,6 @@ export function DecisionsPanel({ insights, onClose, onArea }: { insights: Insigh
         </section>
         <details className="analytics-method"><summary>Допущения и методика расчёта</summary><ul>{insights.assumptions.map((t) => <li key={t}>{t}</li>)}</ul></details>
       </div>
-    </dialog>
+    </section>
   )
 }

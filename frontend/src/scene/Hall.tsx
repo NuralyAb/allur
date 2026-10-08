@@ -16,15 +16,15 @@ import { MAT, unitBox, unitCyl } from './assets'
 import { surfaceTile } from './surfaces'
 
 const glassWall = new MeshStandardMaterial({ color: '#859da9', metalness: 0.15, roughness: 0.18, transparent: true, opacity: 0.48, depthWrite: false })
-const skylight = new MeshStandardMaterial({ color: '#c2cbd0', roughness: 0.32, metalness: 0.12 })
+const skylight = new MeshStandardMaterial({ color: '#64808b', roughness: 0.25, metalness: 0.38 })
 const concreteTexture = surfaceTile('concrete', 1 / 12)
 const roofTexture = surfaceTile('roof', 1 / 10)
 const epoxy = new MeshStandardMaterial({ color: '#9ea6a5', map: concreteTexture, bumpMap: concreteTexture, bumpScale: 0.018, roughness: 0.77, metalness: 0.025 })
-const roofFinish = new MeshStandardMaterial({ color: '#8d9899', map: roofTexture, bumpMap: roofTexture, bumpScale: 0.045, roughness: 0.73, metalness: 0.22 })
+const roofFinish = new MeshStandardMaterial({ color: '#697c80', map: roofTexture, bumpMap: roofTexture, bumpScale: 0.045, roughness: 0.73, metalness: 0.22 })
 const trim = new MeshStandardMaterial({ color: '#42525c', roughness: 0.52, metalness: 0.45 })
 const panelRib = new MeshStandardMaterial({ color: '#afb9bd', roughness: 0.68, metalness: 0.18 })
 const led = new MeshStandardMaterial({ color: '#dfe8e9', emissive: '#dfe8e9', emissiveIntensity: 0.55 })
-const servicePanel = new MeshStandardMaterial({ color: '#b9c0be', roughness: 0.72, metalness: 0.26 })
+const servicePanel = new MeshStandardMaterial({ color: '#879497', roughness: 0.72, metalness: 0.26 })
 const shutter = new MeshStandardMaterial({ color: '#647175', map: roofTexture, roughness: 0.69, metalness: 0.35 })
 
 type HallItem = { p: [number, number, number]; s: [number, number, number] }
@@ -226,13 +226,17 @@ export function Hall({ frame, outline, roof }: Props) {
   )
 }
 
-/** Зенитные фонари — светлые прямоугольники на кровле, как на спутниковом снимке. */
+/** Raised glazing with metal curbs, following the visible roof-light grid. */
 function Skylights({ frame }: { frame: HallFrame }) {
   const items = useMemo(() => {
     const out: { p: [number, number, number]; s: [number, number, number] }[] = []
     for (let u = 70; u < frame.length - 15; u += 9)
-      for (let v = 20; v < frame.width - 15; v += 14) out.push({ p: [u, frame.height + 0.75, -v], s: [3, 0.3, 1.6] })
+      for (let v = 20; v < frame.width - 15; v += 14) out.push({ p: [u, frame.height + 0.94, -v], s: [3, 0.12, 1.6] })
     return out
   }, [frame])
-  return <Instanced geometry={unitBox} material={skylight} items={items} />
+  const curbs = useMemo(() => items.map(({ p }) => ({ p: [p[0], frame.height + 0.76, p[2]] as [number, number, number], s: [3.35, 0.32, 1.95] as [number, number, number] })), [items, frame.height])
+  return <group>
+    <Instanced geometry={unitBox} material={trim} items={curbs} castShadow />
+    <Instanced geometry={unitBox} material={skylight} items={items} />
+  </group>
 }

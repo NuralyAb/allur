@@ -40,6 +40,7 @@ export function HallZones({
         const active = selection?.kind === 'zone' && selection.zone.id === z.id
         const level = z.kpiArea ? status[z.kpiArea] : undefined
         const tag = z.kpiArea && level && level !== 'ok' ? alertTag(z.kpiArea, alerts) : undefined
+        const live = z.kpiArea ? alerts.some((a) => a.area === z.kpiArea && a.kind === 'live') : false
         return (
           <group key={z.id}>
             <mesh
@@ -69,7 +70,7 @@ export function HallZones({
               polygonOffsetFactor={-2}
               polygonOffsetUnits={-4}
             />}
-            {tag && (labels || active || tag === 'Узкое место' || tag.startsWith('Простой')) && (
+            {tag && (labels || active || tag === 'Узкое место' || live) && (
               <Label position={[(u0 + u1) / 2, labels ? 26 : 17, -(v0 + v1) / 2]} color={STATUS_COLOR[level!]} onClick={() => onSelect(z)}>
                 {z.short}: {tag}
               </Label>

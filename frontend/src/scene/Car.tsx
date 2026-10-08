@@ -2,6 +2,7 @@ import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import type { Group, Material, Mesh } from 'three'
 import { MAT } from './assets'
 import { CARS, vertexColored, type CarModelId } from './carModels'
+import type { CarUnit } from './carUnits'
 import { useVehicleFleet } from './VehicleFleet'
 
 export interface CarHandle {
@@ -24,6 +25,8 @@ interface Props {
   details?: boolean
   position?: [number, number, number]
   rotation?: [number, number, number]
+  /** метка для карточки машины: без неё машина не выбирается кликом */
+  unit?: CarUnit
 }
 
 /**
@@ -31,7 +34,7 @@ interface Props {
  * можно менять на лету через ref — так кузов «собирается» по ходу конвейера.
  */
 export const Car = forwardRef<CarHandle, Props>(function Car(
-  { model = 'onix', body = MAT.biw, glass = MAT.opening, wheels = false, details = false, position, rotation },
+  { model = 'onix', body = MAT.biw, glass = MAT.opening, wheels = false, details = false, position, rotation, unit },
   ref,
 ) {
   const geo = CARS[model]
@@ -49,6 +52,7 @@ export const Car = forwardRef<CarHandle, Props>(function Car(
     fleet.vehicles.add(vehicle)
     return () => { fleet.vehicles.delete(vehicle); vehicle.fallback.visible = true }
   }, [fleet, model])
+  useLayoutEffect(() => { root.current.userData.unit = unit }, [unit])
 
   useImperativeHandle(ref, () => ({
     root: root.current,

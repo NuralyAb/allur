@@ -9,6 +9,7 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import importers, insights, kpi, plant, simulation, simulator, store
+from .scada import api as scada
 
 CASE_SOURCE = f"Файл кейса · {importers.CASE_FILE.name}"
 MAX_UPLOAD = 10 * 1024 * 1024
@@ -19,12 +20,15 @@ async def lifespan(_: FastAPI):
     # первый запуск: хранилище заполняется таблицами из DOCX кейса
     if store.default().empty():
         store.default().write(importers.case_dataset(), CASE_SOURCE, mode="replace")
+    await scada.start()
     yield
     simulator.default().stop()
+    await scada.stop()
 
 
 app = FastAPI(title="Allur Digital Twin API", version="0.2.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(scada.router)
 
 
 @app.get("/api/health")

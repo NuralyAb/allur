@@ -91,8 +91,8 @@ test('every shipped near and far car derivative fits its slot and retains manufa
       assert.equal(high.staged, true, `${model} can hide fitted parts during manufacturing`)
       assert.equal(new Set(high.parts.filter(p => p.role === 'wheel').map(p => p.wheel)).size, 4, `${model} retains four wheels`)
     }
-    if (spec.lodUrl) {
-      const low = prepareVehicleGeometry(await loadGeometry(spec.lodUrl), spec)
+    for (const url of [spec.lodUrl, spec.distantUrl].filter(Boolean)) {
+      const low = prepareVehicleGeometry(await loadGeometry(url), spec)
       assert.equal(low.staged, high.staged, `${model} LOD preserves stage semantics`)
       assert.ok(low.triangles < high.triangles * 0.7, `${model} LOD reduces GPU work`)
       assert.deepEqual([...new Set(low.parts.filter(p => p.role === 'wheel').map(p => p.wheel))].sort(), [...new Set(high.parts.filter(p => p.role === 'wheel').map(p => p.wheel))].sort(), `${model} LOD retains all wheel groups`)

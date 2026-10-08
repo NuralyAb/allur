@@ -1,17 +1,19 @@
 import { useEffect, useMemo } from 'react'
-import { BufferAttribute, BufferGeometry, CatmullRomCurve3, CylinderGeometry, DoubleSide, ExtrudeGeometry, IcosahedronGeometry, MeshStandardMaterial, Shape, ShapeGeometry, Vector3 } from 'three'
+import { BufferAttribute, BufferGeometry, CylinderGeometry, DoubleSide, ExtrudeGeometry, IcosahedronGeometry, MeshStandardMaterial, Shape, ShapeGeometry, type Curve, type Vector3 } from 'three'
 import type { Site, XY } from '../types'
 import { unitBox } from './assets'
 import { world } from './geo'
 import { Instanced } from './Hall'
 import { surfaceTile } from './surfaces'
 import { terrainTexture } from './exteriorSurfaces'
+import { OUTBOUND_ROUTE, ROAD_TURN_RADIUS } from './exteriorLayout'
+import { makePath } from './motion'
 
 type Item = { p: [number, number, number]; s: [number, number, number]; r?: number }
 const aggregate = surfaceTile('asphalt', 1 / 6)
-const grass = new MeshStandardMaterial({ color: '#89907a', map: terrainTexture, roughness: 1 })
+const grass = new MeshStandardMaterial({ color: '#71825e', map: terrainTexture, roughness: 1 })
 const apron = new MeshStandardMaterial({ color: '#929894', map: aggregate, bumpMap: aggregate, bumpScale: 0.025, roughness: 0.96 })
-const road = new MeshStandardMaterial({ color: '#62696b', map: aggregate, bumpMap: aggregate, bumpScale: 0.035, roughness: 0.93 })
+const road = new MeshStandardMaterial({ color: '#495256', map: aggregate, bumpMap: aggregate, bumpScale: 0.035, roughness: 0.93 })
 const curb = new MeshStandardMaterial({ color: '#c1c2b6', roughness: 0.9 })
 const markings = new MeshStandardMaterial({ color: '#e8e6d6', roughness: 0.85 })
 const facade = new MeshStandardMaterial({ color: '#a6afad', roughness: 0.78, metalness: 0.16 })
@@ -44,14 +46,14 @@ function inside(point: XY, poly: XY[]) {
 }
 
 /** A shallow, continuous road surface. Coordinates are metres in the hall frame. */
-function roadGeometry(curve: CatmullRomCurve3, width: number) {
-  const count = Math.ceil(curve.getLength() / 4)
+function roadGeometry(curve: Curve<Vector3>, width: number) {
+  const count = Math.ceil(curve.getLength() / 2)
   const positions: number[] = [], uv: number[] = [], index: number[] = []
   for (let i = 0; i <= count; i++) {
     const p = curve.getPointAt(i / count), t = curve.getTangentAt(i / count)
     for (const side of [-1, 1]) {
       positions.push(p.x - t.z * width / 2 * side, -0.016, p.z + t.x * width / 2 * side)
-      uv.push(i * 4, side * width / 2)
+      uv.push(i * 2, side * width / 2)
     }
     if (i < count) { const a = i * 2; index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2) }
   }
@@ -65,24 +67,40 @@ function roadGeometry(curve: CatmullRomCurve3, width: number) {
 
 // Landscape/access detail is an illustrative reconstruction, not a surveyed road plan.
 const ROADS: { points: XY[]; width: number; lane?: boolean }[] = [
-  { points: [[-610, -72], [-300, -72], [40, -72], [380, -72], [640, -72]], width: 16, lane: true },
-  { points: [[157, -8], [157, -30], [175, -40], [360, -40], [388, -24], [388, 295], [373, 318], [210, 329], [160, 345]], width: 13, lane: true },
-  { points: [[-372, -72], [-372, 150], [-363, 290], [-333, 310], [-80, 318], [150, 328], [370, 318]], width: 14, lane: true },
-  { points: [[-80, -72], [-80, 15], [-80, 130], [-66, 195], [-50, 285], [-70, 317]], width: 12 },
+  { points: [[-610, -52], [-300, -52], [40, -52], [380, -52], [640, -52]], width: 16, lane: true },
+  { points: OUTBOUND_ROUTE, width: 13, lane: true },
+  { points: [[-372, -52], [-372, 150], [-363, 290], [-333, 310], [-80, 318], [150, 328], [395, 318]], width: 14, lane: true },
+  { points: [[-22, -52], [-22, 15], [-22, 130], [-22, 195], [-50, 285], [-70, 317]], width: 12 },
   { points: [[-60, 320], [-45, 340], [-45, 420], [-30, 457], [160, 457], [183, 438], [183, 350], [160, 330]], width: 10 },
 ]
 
 function AccessRoads() {
-  const data = useMemo(() => ROADS.map((r) => {
-    const curve = new CatmullRomCurve3(r.points.map(([x, y]) => new Vector3(x, 0, -y)), false, 'centripetal')
+  const data = useMemo(() => {
+    const paths = ROADS.map((r) => {
+      const curve = makePath(r.points.map(([x, y]) => [x, 0, -y]), ROAD_TURN_RADIUS)
+      return { curve, samples: curve.getSpacedPoints(Math.ceil(curve.getLength() / 2)), width: r.width }
+    })
+    const touchesRoad = (x: number, z: number, roadIndex: number, earlierOnly = false) => paths.some((p, i) =>
+      i !== roadIndex && (!earlierOnly || i < roadIndex) && p.samples.some((s) => (s.x - x) ** 2 + (s.z - z) ** 2 < (p.width / 2 + 0.8) ** 2))
+    return ROADS.map((r, roadIndex) => {
+    const curve = paths[roadIndex].curve
     const length = curve.getLength(), lines: Item[] = [], kerbs: Item[] = []
     for (let d = 0; d < length - 6; d += 10) {
       const p = curve.getPointAt((d + 3) / length), t = curve.getTangentAt((d + 3) / length), angle = Math.atan2(-t.z, t.x)
-      if (r.lane) lines.push({ p: [p.x, 0.002, p.z], s: [4.5, 0.008, 0.13], r: angle })
-      for (const side of [-1, 1]) kerbs.push({ p: [p.x - t.z * (r.width / 2 + 0.18) * side, 0.08, p.z + t.x * (r.width / 2 + 0.18) * side], s: [9.85, 0.2, 0.32], r: angle })
+      if (r.lane && !touchesRoad(p.x, p.z, roadIndex, true)) lines.push({ p: [p.x, 0.002, p.z], s: [4.5, 0.008, 0.13], r: angle })
+    }
+    for (let d = 1.5; d < length - 1.5; d += 3) {
+      const p = curve.getPointAt(d / length), t = curve.getTangentAt(d / length), angle = Math.atan2(-t.z, t.x)
+      for (const side of [-1, 1]) {
+        const x = p.x - t.z * (r.width / 2 + 0.18) * side, z = p.z + t.x * (r.width / 2 + 0.18) * side
+        if (!touchesRoad(x, z, roadIndex) && !touchesRoad(x + t.x * 1.5, z + t.z * 1.5, roadIndex) && !touchesRoad(x - t.x * 1.5, z - t.z * 1.5, roadIndex)) {
+          kerbs.push({ p: [x, 0.08, z], s: [2.96, 0.2, 0.32], r: angle })
+        }
+      }
     }
     return { geometry: roadGeometry(curve, r.width), lines, kerbs }
-  }), [])
+    })
+  }, [])
   useEffect(() => () => data.forEach((d) => d.geometry.dispose()), [data])
   return <group>
     {data.map((d, i) => <mesh key={i} geometry={d.geometry} material={road} receiveShadow />)}
@@ -144,7 +162,7 @@ export function Ground({ site, hallAngle }: { site: Site; hallAngle: number }) {
       crowns[i % 3].push({ p: [u, h, -v], s: [2.3 + i % 2 * 0.5, 3.1, 2.1 + i % 3 * 0.2] })
     }
     for (let u = -330; u < 410; u += 42) {
-      for (const v of [-60, 302]) {
+      for (const v of [-62, 302]) {
         poles.push({ p: [u, 4.3, -v], s: [0.16, 8.6, 0.16] })
         arms.push({ p: [u, 8.5, -v - 1.1], s: [0.12, 0.12, 2.4] })
         lights.push({ p: [u, 8.43, -v - 2.25], s: [0.52, 0.15, 1.12] })

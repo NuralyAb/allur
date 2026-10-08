@@ -1,9 +1,10 @@
 import { useProductionFrame, useProductionEnabled } from '../simulation/ProductionClock'
 import { useMemo, useRef } from 'react'
 import { Color, MeshBasicMaterial, MeshStandardMaterial, type Mesh } from 'three'
-import { MAT, unitBox } from './assets'
+import { CAR_COLORS, MAT, unitBox } from './assets'
 import { Car, type CarHandle } from './Car'
 import { pickModel, type CarModelId } from './carModels'
+import { track } from './carUnits'
 import { L } from './geo'
 import { Instanced } from './Hall'
 import { Conveyor, ControlCabinets, PartsRacks } from './Industrial'
@@ -48,10 +49,14 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
       const s = mod(step + i, SLOTS)
       c.root.visible = s <= SLOTS - 1
       c.root.position.set(U0 + s * PITCH, 0.55, -v)
+      track(c.root, Math.min(1, s / (SLOTS - 1)), Math.min(SLOTS, Math.round(s) + 1), Math.floor((step + i) / SLOTS))
     })
   })
 
   const dwell = (t: number) => isDwelling(t + offset, PERIOD, MOVE)
+  const units = useMemo(() => Array.from({ length: SLOTS }, (_, i) => ({
+    key: `welding:${index}:${i}`, place: 'welding' as const, model: car ?? pickModel(i), color: CAR_COLORS[(i + index) % 5], index: i, line: index,
+  })), [car, index])
 
   const robots = useMemo(() => {
     const out: { u: number; side: 1 | -1; tool: 'gun' | 'laser' }[] = []
@@ -90,7 +95,7 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
       <Instanced geometry={unitBox} material={MAT.yellow} items={posts} />
 
       {!simulated && Array.from({ length: SLOTS }, (_, i) => (
-        <Car key={i} ref={(c) => void (cars.current[i] = c)} model={car ?? pickModel(i)} />
+        <Car key={i} ref={(c) => void (cars.current[i] = c)} model={car ?? pickModel(i)} unit={units[i]} />
       ))}
 
       {robots.map((r, i) => (

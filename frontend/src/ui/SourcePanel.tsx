@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { TEMPLATE_URL, importFile, resetData, setLive } from '../api'
 import type { DataSource } from '../types'
 import { Icon } from './Icon'
+import './WorkspacePanel.css'
 import { fmtDate } from './TopBar'
 
 const COUNTS: [keyof DataSource['counts'], string][] = [['lines', 'Работа линий'], ['quality', 'Качество'], ['downtime', 'Простои'], ['monthPlan', 'План месяца']]
@@ -14,7 +15,6 @@ const PATH = [
 ]
 
 export function SourcePanel({ source, onClose, onChanged }: { source: DataSource; onClose: () => void; onChanged: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null!)
   const fileRef = useRef<HTMLInputElement>(null!)
   const [mode, setMode] = useState<'merge' | 'replace'>('merge')
   const [busy, setBusy] = useState(false)
@@ -22,9 +22,7 @@ export function SourcePanel({ source, onClose, onChanged }: { source: DataSource
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    const dialog = ref.current
-    dialog.showModal()
-    return () => dialog.close()
+    document.getElementById('source-title')?.focus({ preventScroll: true })
   }, [])
 
   const run = async (action: () => Promise<unknown>, done: string) => {
@@ -49,13 +47,13 @@ export function SourcePanel({ source, onClose, onChanged }: { source: DataSource
   }
 
   return (
-    <dialog ref={ref} className="analytics-dialog source-dialog" aria-labelledby="source-title" onCancel={onClose}>
+    <section className="workspace-panel analytics-dialog source-dialog" aria-labelledby="source-title">
       <div className="analytics-heading">
         <div className="panel-title-row">
           <span className="panel-heading-icon"><Icon name="grid" /></span>
-          <div><div className="panel-eyebrow">ДАННЫЕ ДВОЙНИКА</div><h2 id="source-title">Источник данных</h2><p>Все показатели, прогноз и решения считаются по одному хранилищу. Писать в него может любой источник ниже.</p></div>
+          <div><div className="panel-eyebrow">ДАННЫЕ ДВОЙНИКА</div><h1 id="source-title" tabIndex={-1}>Источник данных</h1><p>Все показатели, прогноз и решения считаются по одному хранилищу. Писать в него может любой источник ниже.</p></div>
         </div>
-        <button className="analytics-close" onClick={onClose} aria-label="Закрыть"><Icon name="close" /></button>
+        <button type="button" className="workspace-back" onClick={onClose} aria-label="Вернуться к заводу"><Icon name="arrow-left" size={16} />К заводу</button>
       </div>
       <div className="analytics-body">
         <div className="source-current">
@@ -108,6 +106,6 @@ export function SourcePanel({ source, onClose, onChanged }: { source: DataSource
           <button className="text-button" disabled={busy} onClick={() => run(resetData, 'Возвращены данные кейса')}><Icon name="rotate" size={14} />Вернуть данные кейса</button>
         </section>
       </div>
-    </dialog>
+    </section>
   )
 }

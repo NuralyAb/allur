@@ -3,6 +3,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D } from 'three'
 import { MAT, paint } from './assets'
 import { CARS, vertexColored, type CarModelId } from './carModels'
+import type { CarUnit } from './carUnits'
 import { useVehicleFleet, type FleetVehicle } from './VehicleFleet'
 
 export interface ParkedCar {
@@ -10,6 +11,7 @@ export interface ParkedCar {
   r: number
   color: string
   model: CarModelId
+  unit?: CarUnit
 }
 
 const bodyMat = new MeshStandardMaterial({ metalness: 0.55, roughness: 0.32 })
@@ -44,6 +46,7 @@ function ModelInstances({ model, cars, wheels, glass, details }: { model: CarMod
     const root = new Group()
     root.position.set(...car.p)
     root.rotation.y = car.r
+    root.userData.unit = car.unit
     const fallback = new Group()
     const body = new Mesh(undefined, paint(car.color))
     const gl = new Mesh(undefined, MAT.glass)
@@ -111,7 +114,7 @@ function ModelInstances({ model, cars, wheels, glass, details }: { model: CarMod
       <instancedMesh ref={body} args={[geo.body, bodyMat, cars.length]} castShadow />
       {glass && <instancedMesh ref={gl} args={[geo.glass, MAT.glass, cars.length]} />}
       {details && <instancedMesh ref={dt} args={[geo.details, vertexColored, cars.length]} />}
-      {wheels && <instancedMesh ref={wh} args={[geo.wheelsMerged, vertexColored, cars.length]} />}
+      {wheels && <instancedMesh ref={wh} args={[geo.wheelsMergedLow, vertexColored, cars.length]} />}
     </group>
   )
 }

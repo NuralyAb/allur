@@ -4,6 +4,7 @@ import { Color, MeshBasicMaterial, MeshStandardMaterial } from 'three'
 import { CAR_COLORS, MAT, paint, unitBox } from './assets'
 import { Car, type CarHandle } from './Car'
 import { pickModel } from './carModels'
+import { track } from './carUnits'
 import { Instanced } from './Hall'
 import { Conveyor, ControlCabinets, type IndustrialItem } from './Industrial'
 import { Label } from './Label'
@@ -72,35 +73,46 @@ function Bodies() {
   const length = useMemo(() => path.getLength(), [path])
   const count = Math.floor(length / SPACING)
   const cars = useRef<(CarHandle | null)[]>([])
+  const units = useMemo(() => Array.from({ length: count }, (_, i) => ({
+    key: `paint:${i}`, place: 'paint' as const, model: pickModel(i), color: CAR_COLORS[i % 5], index: i,
+  })), [count])
 
   useProductionFrame(({ clock }) => {
     const t = clock.elapsedTime
     cars.current.forEach((c, i) => {
       if (!c) return
-      const dist = mod(t * SPEED + i * SPACING, count * SPACING)
+      const travel = t * SPEED + i * SPACING
+      const dist = mod(travel, count * SPACING)
       const p = placeOnPath(path, length, dist, c.root)
       const pass1 = Math.abs(p.z + V1) < 0.5 && p.y > 2
       const pass3 = Math.abs(p.z + V3) < 0.5
       const u = p.x
+      // номер операции для карточки машины — см. PAINT_STATIONS в ui/carPassport.ts
+      let station = 0
       if (pass1) {
         const y = dip(u)
         c.root.position.y += y
         c.root.rotation.z = (dip(u + 0.4) - dip(u - 0.4)) * 0.6
         c.setBody(u > TANKS[KTL] ? MAT.ed : MAT.biw)
+        station = u < TANKS[KTL] - 3 ? 1 : u <= TANKS[KTL] + 3 ? 2 : 3
       } else if (pass3) {
         c.setBody(u < PRIMER[1] - 4 ? MAT.ed : u < BASE[0] + 12 ? MAT.primer : paint(CAR_COLORS[i % 5]))
+        station = u >= PRIMER[0] && u <= PRIMER[1] ? 6 : u >= BASE[0] && u <= BASE[1] ? 7 : u >= CLEAR[0] && u <= CLEAR[1] ? 8 : 0
       } else if (Math.abs(p.z + V2) < 0.5) {
         c.setBody(MAT.ed)
+        station = u >= 205 && u <= 258 ? 4 : 5
       } else if (Math.abs(p.z + V4) < 0.5) {
         c.setBody(paint(CAR_COLORS[i % 5]))
+        station = u >= 176 && u <= 254 ? 9 : 10
       }
+      track(c.root, dist / (count * SPACING), station, Math.floor(travel / (count * SPACING)))
     })
   })
 
   return (
     <group>
       {Array.from({ length: count }, (_, i) => (
-        <Car key={i} ref={(c) => void (cars.current[i] = c)} model={pickModel(i)} />
+        <Car key={i} ref={(c) => void (cars.current[i] = c)} model={pickModel(i)} unit={units[i]} />
       ))}
     </group>
   )
