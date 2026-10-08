@@ -9,7 +9,7 @@ export function SimulationPanel({ simulation, onAsset, onHide }: { simulation: S
   const { snapshot: s, comparison, comparing, busy, error } = simulation
   const [tab, setTab] = useState<'flow' | 'compare'>('flow')
   const [alternative, setAlternative] = useState('20')
-  const [days, setDays] = useState('23')
+  const [days, setDays] = useState('21')
   const [margin, setMargin] = useState('150000')
   const [cost, setCost] = useState('30000')
   const values = [alternative, days, margin, cost].map(Number)
@@ -82,7 +82,7 @@ export function SimulationPanel({ simulation, onAsset, onHide }: { simulation: S
             <h3>Результат за смену</h3>
             <div className="comparison-columns"><div><span>База · {number(result.parameters.repairMinutes)} мин</span><strong data-testid="baseline-good">{result.baseline.good}</strong><small>годных авто</small></div><div><span>Вариант · {number(result.parameters.alternativeRepair)} мин</span><strong data-testid="alternative-good">{result.alternative.good}</strong><small>годных авто</small></div></div>
             <div className="scenario-delta"><b data-testid="delta-good">{result.deltaGood > 0 ? '+' : ''}{result.deltaGood} авто</b><span>{number(result.savedMinutes)} мин разницы простоя</span></div>
-            <section className="month-forecast"><h3>Месяц · цель 5 500</h3>{[['База', result.month.baseline], ['Вариант', result.month.alternative]].map(([label, value]) => <div key={label}><span>{label}</span><b>{number(Number(value))}</b><span className="month-track"><span style={{ width: `${Math.min(100, Number(value) / 5500 * 100)}%` }} /></span><small>{Number(value) >= 5500 ? `выше цели на ${number(Number(value) - 5500)}` : `до цели ${number(5500 - Number(value))}`}</small></div>)}<p>{result.month.days} рабочих дней · два отказа в день по сценарию · результат модели</p></section>
+            <section className="month-forecast"><h3>Месяц · цель {number(result.month.target)}</h3>{[['База', result.month.baseline, result.month.probTarget[0]], ['Вариант', result.month.alternative, result.month.probTarget[1]]].map(([label, value, prob]) => <div key={label}><span>{label}</span><b>{number(Number(value))}</b><span className="month-track"><span style={{ width: `${Math.min(100, Number(value) / result.month.target * 100)}%` }} /></span><small>{Number(value) >= result.month.target ? `выше цели на ${number(Number(value) - result.month.target)}` : `до цели ${number(result.month.target - Number(value))}`} · цель в {Math.round(Number(prob) * 100)}% прогонов</small></div>)}<p>{result.month.days} рабочих дней · медиана {result.month.runs} прогонов единой модели прогноза, калиброванной по данным завода (та же, что в центре решений)</p></section>
             <section className="loss-explanation"><h3>Почему изменился выпуск</h3><p className="sim-field-hint">Разбор полной базовой смены, независимо от текущего времени сцены.</p>{result.causes.map((cause, i) => <button key={i} onClick={() => { const asset = s.stages.find((x) => x.id === cause.assetId); if (asset) onAsset(asset) }}>{cause.text}<span aria-hidden="true">↗</span></button>)}
               <p className="sim-field-hint">{result.bottleneck.method} Лучший результат: {result.bottleneck.label}, +{result.bottleneck.extraGood} годных авто.</p>
             </section>

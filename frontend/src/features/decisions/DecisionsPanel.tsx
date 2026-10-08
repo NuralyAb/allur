@@ -3,6 +3,9 @@ import { runScenario } from '../../shared/api/twin'
 import type { Insights, ScenarioResult } from '../../shared/types'
 import { Icon } from '../../shared/ui/Icon'
 import '../workspace/WorkspacePanel.css'
+import { loadForecastModel } from './studio/api'
+import { PlanFinder, ProbabilityForecast, ReliabilityControls, SensitivityView, fromPlan, toRequest, type StudioChoice } from './studio/ForecastStudio'
+import type { ForecastModel } from './studio/types'
 
 const num = (x: number) => x.toLocaleString('ru-RU', { maximumFractionDigits: 1 })
 const signed = (x: number) => (x > 0 ? '+' : x < 0 ? '−' : '') + num(Math.abs(x))
@@ -19,6 +22,11 @@ export function DecisionsPanel({ insights, onClose, onArea }: { insights: Insigh
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [retry, setRetry] = useState(0)
+  // параметры надёжности сценарной студии: влияют на вероятностный прогноз
+  const [model, setModel] = useState<ForecastModel | null>(null)
+  const [buffer, setBuffer] = useState<number | null>(null)
+  const [repairPct, setRepairPct] = useState(100)
+  const [speedPct, setSpeedPct] = useState(0)
   // Маржинальный доход на автомобиль вводит руководитель: в данных кейса его нет.
   const [margin, setMargin] = useState('')
   const parsedMargin = Number(margin.replace(/\s/g, ''))
@@ -31,6 +39,7 @@ export function DecisionsPanel({ insights, onClose, onArea }: { insights: Insigh
 
   useEffect(() => {
     document.getElementById('decisions-title')?.focus({ preventScroll: true })
+    loadForecastModel().then(setModel, () => setModel(null))
   }, [])
 
   useEffect(() => {
@@ -50,10 +59,16 @@ export function DecisionsPanel({ insights, onClose, onArea }: { insights: Insigh
     return () => { window.clearTimeout(timer); ctrl.abort() }
   }, [levers, shifts, days, extraShifts, validInputs, retry])
 
+  const choice: StudioChoice = { levers, shifts, days, extraShifts, buffer: buffer ?? model?.buffer ?? 10, repairPct, speedPct }
+  const forecastRequest = model && validInputs ? toRequest(model, choice, base.bottleneck) : null
+  const applyChoice = (c: StudioChoice) => {
+    setLevers(c.levers); setShifts(c.shifts); setDaysInput(String(c.days)); setExtraShiftsInput(String(c.extraShifts))
+    setBuffer(c.buffer); setRepairPct(c.repairPct); setSpeedPct(c.speedPct)
+  }
   const toggle = (id: string) => setLevers((ls) => (ls.includes(id) ? ls.filter((x) => x !== id) : [...ls, id]))
-  const reset = () => { setLevers([]); setShifts(base.shifts); setDaysInput(String(base.days)); setExtraShiftsInput('0') }
+  const reset = () => { setLevers([]); setShifts(base.shifts); setDaysInput(String(base.days)); setExtraShiftsInput('0'); setBuffer(null); setRepairPct(100); setSpeedPct(0) }
   const gain = result.month - base.month
-  const changed = levers.length > 0 || shifts !== base.shifts || days !== base.days || extraShifts > 0
+  const changed = levers.length > 0 || shifts !== base.shifts || days !== base.days || extraShifts > 0 || buffer !== null || repairPct !== 100 || speedPct !== 0
   const stale = loading || !!error || !validInputs
 
   return (
@@ -131,6 +146,24 @@ export function DecisionsPanel({ insights, onClose, onArea }: { insights: Insigh
             )}
           </div>
         </section>
+
+        {model && <>
+          <section aria-labelledby="forecast-title">
+            <div className="section-heading"><div><h3 id="forecast-title">Вероятностный прогноз месяца</h3><p className="section-meta">Тот же сценарий, но отказы случаются в случайное время и длятся случайно, буферы между участками конечны.</p></div></div>
+            <ReliabilityControls model={model} choice={choice} bottleneck={base.bottleneck} onChange={(c) => { setBuffer(c.buffer); setRepairPct(c.repairPct); setSpeedPct(c.speedPct) }} />
+            <ProbabilityForecast request={forecastRequest} model={model} />
+          </section>
+          <section aria-labelledby="plan-title">
+            <div className="section-heading"><div><h3 id="plan-title">Как выйти на цель</h3><p className="section-meta">Самые дешёвые сочетания мероприятий и смен в выходные, при которых цель выполняется с заданной уверенностью.</p></div></div>
+            <PlanFinder margin={marginValue} target={model.target} onApply={(p) => { applyChoice(fromPlan(p, choice)); document.getElementById('forecast-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }} />
+          </section>
+          <section aria-labelledby="sensitivity-title">
+            <div className="section-heading"><div><h3 id="sensitivity-title">Что сильнее влияет на выпуск</h3><p className="section-meta">Каждое мероприятие отдельно, на одних и тех же случайных отказах. Отрезок — 80% прогонов.</p></div></div>
+            <SensitivityView margin={marginValue} />
+            <p className="analytics-note">Расчёт по средним показывает эффект только на узком месте. Модель с буферами видит больше: долгий отказ сборки через заполненный буфер останавливает окраску, поэтому предиктивное ТО и быстрый ремонт конвейера дают прирост, хотя сборка — не узкое место.</p>
+          </section>
+          <details className="analytics-method"><summary>Как устроен вероятностный прогноз</summary><ul>{model.assumptions.map((t) => <li key={t}>{t}</li>)}</ul></details>
+        </>}
 
         <section>
           <div className="section-heading"><h3>Отклонения базового сценария</h3><span className="section-meta">{insights.alerts.length} уведомлений</span></div>

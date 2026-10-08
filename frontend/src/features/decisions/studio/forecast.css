@@ -1,0 +1,79 @@
+/* Сценарная студия: вероятностный прогноз, эффект мероприятий, подбор плана. Цвета — токены приложения. */
+.fc-loading { display: flex; align-items: center; gap: 8px; padding: 22px; border: 1px dashed #d8dfe8; border-radius: 10px; color: var(--muted); font-size: 12px; }
+.fc-forecast { transition: opacity .2s; }
+.fc-forecast.stale { opacity: .55; }
+.fc-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.fc-tiles > div { display: grid; gap: 4px; align-content: start; padding: 16px; background: #fafbfc; border: 1px solid #edf0f4; border-radius: 10px; }
+.fc-tiles span { font-size: 12px; color: var(--muted); }
+.fc-tiles strong { font-size: 26px; letter-spacing: -.5px; color: var(--text); }
+.fc-tiles strong small { font-size: 13px; font-weight: 600; color: var(--muted); }
+.fc-tiles > div > small { font-size: 11px; line-height: 1.55; color: var(--muted); }
+.fc-tiles .ok { border-left: 3px solid var(--ok); }
+.fc-tiles .warn { border-left: 3px solid var(--warn); }
+.fc-tiles .bad { border-left: 3px solid var(--bad); }
+.fc-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; }
+.fc-grid section { margin: 0; }
+.fc-forecast h4, .fc-plan h4 { font-size: 13px; margin: 0 0 10px; }
+.fc-chart { position: relative; }
+.fc-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.fc-axis { stroke: #d5dbe3; stroke-width: 1; }
+.fc-band { fill: #2a78d6; opacity: .07; }
+.fc-median { stroke: #252a34; stroke-width: 2; }
+.fc-ref { stroke: #737b88; stroke-width: 1.5; stroke-dasharray: 4 4; }
+.fc-whisker { stroke: #252a34; stroke-width: 2; stroke-linecap: round; }
+.fc-label { font-size: 11px; fill: #4b5563; }
+.fc-label.strong { font-weight: 700; fill: #252a34; }
+.fc-label.muted { fill: #8a93a0; }
+.fc-tip { position: absolute; transform: translate(-50%, calc(-100% - 10px)); background: #1c222c; color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 11px; display: grid; gap: 2px; pointer-events: none; white-space: nowrap; z-index: 2; }
+.fc-caption { font-size: 11px; color: var(--muted); line-height: 1.6; margin: 8px 0 0; }
+.fc-table { margin-top: 6px; }
+.fc-table summary { cursor: pointer; font-size: 11px; color: var(--muted); }
+.fc-table table, .fc-areas { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; }
+.fc-table th, .fc-table td, .fc-areas th, .fc-areas td { text-align: left; padding: 5px 6px; border-bottom: 1px solid #eef1f5; }
+.fc-areas th { color: var(--muted); font-weight: 600; }
+.fc-share-bar { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; background: #eef1f5; }
+.fc-share-bar span { display: block; height: 100%; }
+.fc-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 12px; color: #4b5563; }
+.fc-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.fc-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 4px 0 18px; }
+.fc-controls label { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid #edf0f4; border-radius: 10px; font-size: 12px; }
+.fc-controls label > span { display: flex; justify-content: space-between; gap: 8px; color: #4b5563; }
+.fc-controls input[type=range] { width: 100%; accent-color: #2a78d6; }
+.fc-controls small { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.fc-plan-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 12px; }
+.fc-plan-form label { display: grid; gap: 6px; font-size: 12px; color: #4b5563; }
+.fc-plan-form select { min-height: 40px; padding: 0 10px; border: 1px solid #dfe4ea; border-radius: 8px; background: #fff; font: inherit; }
+.fc-primary { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; }
+.fc-primary:hover { background: var(--accent-hover); }
+.fc-primary:disabled { opacity: .6; cursor: progress; }
+.fc-plans { list-style: none; padding: 0; margin: 12px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.fc-plans > li { display: grid; gap: 10px; align-content: start; padding: 16px; border: 1px solid #e6eaf0; border-radius: 10px; background: #fff; }
+.fc-plans > li.best { border-color: var(--ok); box-shadow: inset 0 3px 0 var(--ok); }
+.fc-plans header { display: grid; gap: 4px; }
+.fc-plans header strong { font-size: 20px; }
+.fc-plans header strong small { font-size: 12px; color: var(--muted); font-weight: 600; }
+.fc-plans ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 12px; }
+.fc-plans ul li { display: flex; justify-content: space-between; gap: 10px; }
+.fc-plans ul small { color: var(--muted); white-space: nowrap; }
+.fc-plan-result { display: grid; gap: 3px; font-size: 12px; padding-top: 10px; border-top: 1px solid #eef1f5; }
+.fc-plan-result .ok { color: var(--ok); }
+.fc-plan-result .bad, .fc-plan .bad { color: var(--bad); }
+@media (max-width: 900px) {
+  .fc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fc-grid, .fc-controls { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) { .fc-tiles { grid-template-columns: 1fr; } }
+.fc-sens ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.fc-sens li { display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(120px, 2fr) 56px; align-items: center; gap: 14px; padding: 8px 6px; border-radius: 8px; }
+.fc-sens li:hover, .fc-sens li:focus-visible { background: #f5f7fa; outline: none; }
+.fc-sens-label { display: grid; gap: 2px; font-size: 12px; color: var(--text); }
+.fc-sens-label small { font-size: 11px; color: var(--muted); }
+.fc-sens-track { position: relative; height: 18px; }
+.fc-sens-zero { position: absolute; top: -4px; bottom: -4px; width: 1px; background: #d5dbe3; }
+.fc-sens-bar { position: absolute; top: 1px; height: 16px; border-radius: 4px; background: #2a78d6; }
+.fc-sens-whisker { position: absolute; top: 8px; height: 2px; border-radius: 1px; background: #252a34; }
+.fc-sens li > b { font-size: 13px; text-align: right; color: var(--text); }
+@media (max-width: 520px) {
+  .fc-sens li { grid-template-columns: 1fr 52px; }
+  .fc-sens-label { grid-column: 1 / -1; }
+}

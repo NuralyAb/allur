@@ -34,7 +34,7 @@ export interface CompareParameters extends SimulationConfig {
 export interface Comparison {
   parameters: CompareParameters; baseline: EngineSnapshot; alternative: EngineSnapshot
   healthyGood: number; deltaGood: number; savedMinutes: number; effectKzt: number
-  month: { baseline: number; alternative: number; target: number; days: number; shiftsPerDay: number }
+  month: { baseline: number; alternative: number; target: number; days: number; shiftsPerDay: number; runs: number; probTarget: [number, number] }
   causes: { assetId: string; text: string }[]; assumptions: string[]
   bottleneck: { assetId: string; label: string; extraGood: number; method: string; trials: { assetId: string; label: string; extraGood: number }[] }
 }

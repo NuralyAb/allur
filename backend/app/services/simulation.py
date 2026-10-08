@@ -12,7 +12,13 @@ from threading import RLock
 import time
 from uuid import uuid4
 
+import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
+
+from . import forecast, kpi
+
+CONVEYOR = "Конвейер-03"
+MONTH_RUNS = 300
 
 
 class SimulationConfig(BaseModel):
@@ -26,7 +32,7 @@ class SimulationConfig(BaseModel):
 
 class CompareRequest(SimulationConfig):
     alternativeRepair: float = Field(default=20, ge=0, le=180)
-    workingDays: int = Field(default=23, ge=1, le=31, strict=True)
+    workingDays: int = Field(default=21, ge=1, le=31, strict=True)
     contributionMargin: float = Field(default=150_000, ge=0, le=10_000_000)
     interventionCost: float = Field(default=30_000, ge=0, le=100_000_000)
 
@@ -277,8 +283,13 @@ def compare(request: CompareRequest):
         engine.advance(horizon)
         return engine.snapshot()
     baseline, improved = run(base, 480), run(alternative, 480)
-    month_horizon = request.workingDays * 2 * 480
-    month_base, month_improved = run(base, month_horizon), run(alternative, month_horizon)
+    # месяц считает единое ядро прогноза (сценарная студия), калиброванное по данным завода:
+    # тот же ответ, что в центре решений, а не отдельная модель со своими тактами
+    month_runs = forecast.monte_carlo(forecast.calibrate(), [
+        forecast.Scenario(days=request.workingDays, repair={CONVEYOR: request.repairMinutes}),
+        forecast.Scenario(days=request.workingDays, repair={CONVEYOR: request.alternativeRepair}),
+    ], MONTH_RUNS)
+    month_base, month_improved = (float(np.median(r["month"])) for r in month_runs)
     healthy = run(base.model_copy(update={"repairMinutes": 0}), 480)
     healthy_config = base.model_copy(update={"repairMinutes": 0})
     trials = []
@@ -299,8 +310,9 @@ def compare(request: CompareRequest):
                        "method": "Поочерёдное сокращение такта каждого ресурса на 10% в контрольной смене без отказа."},
         "savedMinutes": baseline["stages"][2]["durations"]["FAULT"] - improved["stages"][2]["durations"]["FAULT"],
         "effectKzt": round(delta * request.contributionMargin - request.interventionCost),
-        "month": {"baseline": month_base["good"], "alternative": month_improved["good"], "target": 5500,
-                  "days": request.workingDays, "shiftsPerDay": 2},
+        "month": {"baseline": round(month_base), "alternative": round(month_improved), "target": kpi.targets()["monthly_output"],
+                  "days": request.workingDays, "shiftsPerDay": kpi.targets()["shifts"], "runs": MONTH_RUNS,
+                  "probTarget": [round(float(np.mean(r["month"] >= kpi.targets()["monthly_output"])), 3) for r in month_runs]},
         "causes": [
             {"assetId": "Конвейер-03", "text": f"Отказ сборки: {durations[2]['durations']['FAULT']:.0f} мин без обработки."},
             {"assetId": "Камера-02", "text": f"Окраска заблокирована {durations[1]['durations']['BLOCKED']:.1f} мин: на {durations[1]['durations']['BLOCKED'] - healthy['stages'][1]['durations']['BLOCKED']:.1f} мин больше контрольного прогона без отказа."},
@@ -308,7 +320,8 @@ def compare(request: CompareRequest):
             {"assetId": "Конвейер-03", "text": f"Контрольный прогон без отказа: {healthy['good']} годных; разница с базой — {loss} авто за смену."},
         ],
         "assumptions": ASSUMPTIONS + [
-            "Месячный результат рассчитан отдельным прогоном, а не умножением одной смены.",
+            "Месяц — медиана прогонов единой модели прогноза, калиброванной по данным завода: частота и длительность "
+            "отказов — из журнала простоев, меняется только длительность ремонта Конвейера-03.",
             "Экономический эффект относится к одной смене; маржинальный доход и цена вмешательства заданы пользователем.",
         ],
     }
