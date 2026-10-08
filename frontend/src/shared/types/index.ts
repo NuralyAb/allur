@@ -119,8 +119,8 @@ export interface Lever {
 export interface Alert {
   level: Level
   area: string | null
-  /** live — простой, который идёт прямо сейчас (из потока симулятора или линии) */
-  kind: 'bottleneck' | 'quality' | 'flow' | 'equipment' | 'plan' | 'live'
+  /** live — простой, который идёт прямо сейчас (из потока симулятора или линии); ai — прогноз отказа или аномалия от моделей ИИ */
+  kind: 'bottleneck' | 'quality' | 'flow' | 'equipment' | 'plan' | 'live' | 'ai'
   title: string
   text: string
 }

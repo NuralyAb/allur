@@ -183,6 +183,13 @@ def post_field(cid: str, body: FieldBody, authorization: str | None = Header(Non
         if code not in c.faults:
             raise HTTPException(422, "Неизвестный код неисправности")
         rt.sim.inject_fault(cid, code)
+    elif body.action == "degrade":
+        p = c.param(body.param or "")
+        if p is None or not body.rate:
+            raise HTTPException(422, "Укажите параметр контроллера и скорость ухода, ед./мин")
+        rt.sim.degrade(cid, p.id, body.rate)
+    elif body.action == "repair":
+        rt.sim.repair(cid)
     elif body.action in ("estop", "release"):
         rt.sim.set_safety(cid, body.action == "release")
     else:
@@ -190,8 +197,11 @@ def post_field(cid: str, body: FieldBody, authorization: str | None = Header(Non
     user = rt.users.user(token_of(authorization))
     labels = {"fault": f"Симуляция отказа: {s.registry.fault_text(c, body.code or next(iter(c.faults), 0))}",
               "estop": "Симуляция: нажата аварийная кнопка", "release": "Симуляция: аварийная кнопка отжата",
-              "local": "Симуляция: ключ «Местный»", "remote": "Симуляция: ключ «Дистанционный»"}
-    s.db.audit("field", user.login, user.role, cid, labels[body.action], {"code": body.code}, "ok")
+              "local": "Симуляция: ключ «Местный»", "remote": "Симуляция: ключ «Дистанционный»",
+              "degrade": f"Симуляция износа: {body.param} {body.rate:+g} ед./мин" if body.rate else "",
+              "repair": "Симуляция: узел отремонтирован"}
+    s.db.audit("field", user.login, user.role, cid, labels[body.action],
+               {"code": body.code, "param": body.param, "rate": body.rate}, "ok")
     return {"ok": True}
 
 

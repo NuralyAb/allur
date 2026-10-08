@@ -19,7 +19,36 @@ from .registry import RAW_SPAN, Controller, Registry, Signal
 SCAN_S = 0.2
 ACTING_S = 1.5  # длительность переходных состояний (Запуск, Сброс, Остановка…)
 ESTOP_CODE, SCADA_ABORT_CODE = 900, 910
+MAX_DEFECT_RATE = 0.6
 log = logging.getLogger("scada.plcsim")
+
+
+def quality_excess(c: Controller, values: dict[str, float], setpoints: dict[str, float] | None = None) -> dict[str, float]:
+    """Вклад каждого параметра в рост брака (в показателе экспоненты) по блоку sim.quality контроллера.
+
+    above/below — превышение порога, dev — отклонение от уставки (или номинала), всё в долях scale.
+    Пример: фильтр окрасочной камеры засоряется — на кузов летит пыль, брак растёт.
+    """
+    out = {}
+    for f in c.sim.get("quality", []):
+        v = values.get(f["param"])
+        if v is None:
+            continue
+        p = c.param(f["param"])
+        if f["kind"] == "above":
+            x = max(0.0, v - f["ref"])
+        elif f["kind"] == "below":
+            x = max(0.0, f["ref"] - v)
+        else:
+            ref = (setpoints or {}).get(p.id, p.sp["value"] if p.sp else p.nominal)
+            x = abs(v - ref)
+        out[f["param"]] = f["gain"] * x / f["scale"]
+    return out
+
+
+def defect_probability(c: Controller, values: dict[str, float], setpoints: dict[str, float] | None = None) -> float:
+    """Вероятность брака кузова при данном режиме процесса: базовый уровень × exp(сумма вкладов)."""
+    return min(MAX_DEFECT_RATE, c.sim.get("defectRate", 0.0) * math.exp(sum(quality_excess(c, values, setpoints).values())))
 
 
 class SimPlc:
@@ -43,6 +72,9 @@ class SimPlc:
         self.heartbeat = 0
         self.true = {}  # истинные значения процесса (без шума измерения)
         self.on_for: dict[str, float] = {}  # сколько секунд параметр «в работе»: защита по нижнему пределу ждёт выхода на режим
+        # развивающаяся неисправность (подшипник, засор, утечка): параметр уходит от режима со скоростью wear ед./мин
+        self.wear: dict[str, float] = {}
+        self.offset: dict[str, float] = {}
         self.sp = {}
         for p in c.params:
             if p.sp:
@@ -129,6 +161,8 @@ class SimPlc:
                     for p in self.c.params:
                         if p.resetTo is not None and p.trip and p.trip["code"] == self.stop_reason:
                             self.true[p.id] = p.resetTo
+                        if p.trip and p.trip["code"] == self.stop_reason:
+                            self.repair(p.id)
                 if self.state == State.IDLE:
                     self.stop_reason = 0
         k_speed = 1 - math.exp(-dt / 2)
@@ -141,7 +175,9 @@ class SimPlc:
                 if on:
                     self.true[p.id] = min(p.range[1], self.true[p.id] + p.drift * dt / 60)
             else:
-                target = self._target(p) if on else p.ambient
+                if on and p.id in self.wear:
+                    self.offset[p.id] = self.offset.get(p.id, 0.0) + self.wear[p.id] * dt / 60
+                target = self._target(p) + self.offset.get(p.id, 0.0) if on else p.ambient
                 self.true[p.id] += (target - self.true[p.id]) * (1 - math.exp(-dt / max(p.tau, 1e-3)))
             if p.trip and on and self._tripped(p):
                 self.abort(p.trip["code"])
@@ -150,8 +186,25 @@ class SimPlc:
             while self.progress >= 1:
                 self.progress -= 1
                 self.processed += 1
-                self.defective += self.rng.random() < self.defect_rate
+                self.defective += self.rng.random() < self.defect_now()
         self._publish()
+
+    def defect_now(self) -> float:
+        """Вероятность брака при текущем режиме: без блока sim.quality — постоянный уровень из паспорта."""
+        if not self.c.sim.get("quality"):
+            return self.defect_rate
+        return min(MAX_DEFECT_RATE, self.defect_rate * math.exp(sum(quality_excess(self.c, self.true, self.sp).values())))
+
+    def degrade(self, pid: str, rate: float):
+        """Начать развивающуюся неисправность: параметр уходит от режима на rate ед./мин, пока узел не отремонтируют."""
+        if self.c.param(pid) is None:
+            raise KeyError(f"{self.c.id}: нет параметра {pid}")
+        self.wear[pid] = rate
+
+    def repair(self, pid: str | None = None):
+        for p in [pid] if pid else list(self.wear):
+            self.wear.pop(p, None)
+            self.offset.pop(p, None)
 
     def _tripped(self, p) -> bool:
         v, t = self.true[p.id], p.trip
@@ -255,6 +308,12 @@ class PlcSim:
     # --- действия «на линии», а не со SCADA: для демонстрации ---------------------------------
     def inject_fault(self, cid: str, code: int):
         self.plcs[cid].abort(code)
+
+    def degrade(self, cid: str, pid: str, rate: float):
+        self.plcs[cid].degrade(pid, rate)
+
+    def repair(self, cid: str):
+        self.plcs[cid].repair()
 
     def set_safety(self, cid: str, ok: bool):
         self.plcs[cid].safety_ok = ok

@@ -25,12 +25,14 @@ import type { Object3D } from 'three'
 import { cycleOf, unitOf, type CarSelection, type UnitPlace } from '../scene/vehicles/carUnits'
 import { CarPanel } from '../features/vehicles/CarPanel'
 import { useAlarmSummaryKey } from '../features/scada/scada'
+import { AiPanel } from '../features/ai/AiPanel'
+import { useAiSceneKey } from '../features/ai/api'
 
 const STEP_MS = 9000
 /** Машины внутри корпуса: под кровлей они не отображаются. */
 const INTERIOR = new Set<UnitPlace>(['welding', 'paint', 'pbs', 'assembly', 'qc'])
-type WorkspaceView = 'factory' | 'analytics' | 'decisions' | 'sources'
-const VIEW_TITLES: Record<WorkspaceView, string> = { factory: 'Завод в 3D', analytics: 'Аналитика', decisions: 'Центр решений', sources: 'Источники данных' }
+type WorkspaceView = 'factory' | 'analytics' | 'decisions' | 'ai' | 'sources'
+const VIEW_TITLES: Record<WorkspaceView, string> = { factory: 'Завод в 3D', analytics: 'Аналитика', decisions: 'Центр решений', ai: 'ИИ-аналитик', sources: 'Источники данных' }
 
 export default function App() {
   const [data, setData] = useState<{ plant: Plant; site: Site; kpi: Kpi; insights: Insights } | null>(null)
@@ -63,17 +65,21 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
   const activeKey = JSON.stringify(live?.shift?.active.map((e) => [e.area, e.equipment, e.reason]) ?? [])
   // тревоги ПЛК из SCADA: приоритет 1 — отклонение, 2–3 — внимание; статус участка только повышается
   const plcKey = useAlarmSummaryKey()
+  // прогнозы отказов и аномалии от моделей ИИ: участок подсвечивается раньше, чем сработает тревога ПЛК
+  const aiKey = useAiSceneKey()
   const [sceneAlerts, sceneStatus] = useMemo(() => {
     const active = JSON.parse(activeKey) as [string, string, string][]
     const plc = JSON.parse(plcKey) as { area: string; priority: number; title: string }[]
+    const predicted = JSON.parse(aiKey) as { area: string; level: Level; kind: string; title: string }[]
     const liveAlerts: Alert[] = active.map(([area, equipment, reason]) => ({ level: 'bad', area, kind: 'live', title: `Простой: ${equipment}`, text: reason }))
     const plcAlerts: Alert[] = plc.map((a) => ({ level: a.priority === 1 ? 'bad' : 'warn', area: a.area, kind: 'live', title: a.title, text: 'Тревога ПЛК' }))
+    const aiAlerts: Alert[] = predicted.map((a) => ({ level: a.level, area: a.area, kind: 'ai', title: a.title, text: a.kind === 'anomaly' ? 'Аномалия режима (ИИ)' : 'Прогноз отказа (ИИ)' }))
     const status: Record<string, Level> = { ...insights.status }
     const rank = { ok: 0, warn: 1, bad: 2 }
-    for (const a of plcAlerts) if (a.area && rank[a.level] > rank[status[a.area] ?? 'ok']) status[a.area] = a.level
+    for (const a of [...plcAlerts, ...aiAlerts]) if (a.area && rank[a.level] > rank[status[a.area] ?? 'ok']) status[a.area] = a.level
     for (const [area] of active) status[area] = 'bad'
-    return [[...liveAlerts, ...plcAlerts, ...insights.alerts], status]
-  }, [activeKey, plcKey, insights])
+    return [[...liveAlerts, ...plcAlerts, ...aiAlerts, ...insights.alerts], status]
+  }, [activeKey, plcKey, aiKey, insights])
   const sourceLabel = live?.running ? 'Live · симулятор' : source?.source.startsWith('Импорт') ? 'Импорт' : source?.source.startsWith('Симулятор') ? 'Данные симулятора' : 'Данные кейса'
   const tour = useMemo(() => buildTour(plant.hall), [plant])
   const [selection, setSelection] = useState<Selection>(null)
@@ -252,6 +258,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
   const openWorkspace = (next: WorkspaceView) => { setNavigation(false); setPlaying(false); setHelp(false); setView(next) }
   const openAnalytics = () => openWorkspace('analytics')
   const openDecisions = () => openWorkspace('decisions')
+  const openAi = () => openWorkspace('ai')
   const openSources = () => { openWorkspace('sources'); if (!source) refresh() }
   // сцена тяжёлая: пересоздаём элемент только при изменении её входов, а не на каждом сообщении потока
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -265,8 +272,8 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
     <div className={`app${sidebarCollapsed ? ' sidebar-collapsed' : ''}${navigation ? ' navigation-open' : ''}${view === 'factory' && sceneFocused ? ' scene-focused' : ''}`}>
       <a className="skip-link" href="#main-content">Перейти к рабочей области</a>
       {navigation && <button className="navigation-backdrop" aria-label="Закрыть навигацию" onClick={() => setNavigation(false)} />}
-      <ZoneList view={view} open={navigation} collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} onExpand={expandSidebar} plant={plant} status={insights.status} insights={insights} selection={selection} onZone={selectZone} onOutdoor={selectOutdoor} onClose={closeNavigation} onOverview={overview} onAnalytics={openAnalytics} onDecisions={openDecisions} onSource={openSources} />
-      <TopBar factoryView={view === 'factory'} sectionTitle={VIEW_TITLES[view]} plant={plant} kpi={kpi} insights={insights} sourceLabel={sourceLabel} live={!!live?.running} onSource={openSources} onDecisions={openDecisions} simulationMode={simulationMode} connected={simulation.connected} busy={simulation.busy} onSimulation={() => void toggleSimulation()} navigation={navigation} onNavigation={() => { setPlaying(false); setNavigation(v => !v) }} onAnalytics={openAnalytics} />
+      <ZoneList view={view} open={navigation} collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} onExpand={expandSidebar} plant={plant} status={insights.status} insights={insights} selection={selection} onZone={selectZone} onOutdoor={selectOutdoor} onClose={closeNavigation} onOverview={overview} onAnalytics={openAnalytics} onDecisions={openDecisions} onAi={openAi} onSource={openSources} />
+      <TopBar factoryView={view === 'factory'} sectionTitle={VIEW_TITLES[view]} plant={plant} kpi={kpi} insights={insights} sourceLabel={sourceLabel} live={!!live?.running} onSource={openSources} onDecisions={openDecisions} simulationMode={simulationMode} connected={simulation.connected} busy={simulation.busy} onSimulation={() => void toggleSimulation()} navigation={navigation} onNavigation={() => { setPlaying(false); setNavigation(v => !v) }} onAnalytics={openAnalytics} onAi={openAi} />
       <main inert={navigation} className={`dashboard${view !== 'factory' ? ' workspace-view' : ''}`} id="main-content">
         {/* 3D-сцена не размонтируется при переходе в другие разделы: пересоздание WebGL, шейдеров и моделей
             давало рывок 200–300 мс при каждом возврате. Скрытая сцена стоит на паузе. */}
@@ -286,6 +293,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
         </div>
         {view === 'analytics' ? <AnalyticsPanel kpi={kpi} onClose={() => openWorkspace('factory')} onArea={showArea} />
           : view === 'decisions' ? <DecisionsPanel insights={insights} onClose={() => openWorkspace('factory')} onArea={showArea} />
+          : view === 'ai' ? <AiPanel onClose={() => openWorkspace('factory')} onArea={showArea} />
           : view !== 'sources' ? null
           : source ? <SourcePanel source={source} onClose={() => openWorkspace('factory')} onChanged={refresh} />
           : <section className="workspace-empty" aria-live="polite"><Icon name={sourceError ? 'alert' : 'grid'} size={32} /><h1>Источники данных</h1><p>{sourceError ? 'Не удалось загрузить сведения об источнике.' : 'Загружаем сведения об источнике…'}</p>{sourceError && <button className="button-primary" onClick={refresh}>Повторить загрузку</button>}</section>}

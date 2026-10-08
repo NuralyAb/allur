@@ -4,7 +4,7 @@ import { Icon, type IconName } from '../../shared/ui/Icon'
 
 import { fmtDate } from '../../shared/lib/format'
 
-export function TopBar({ sectionTitle, factoryView, plant, kpi, sourceLabel, live, navigation, onNavigation, onAnalytics, onDecisions, onSource, simulationMode, connected, busy, onSimulation }: { sectionTitle: string; factoryView: boolean; plant: Plant; kpi: Kpi; insights: Insights; sourceLabel: string; live: boolean; navigation: boolean; onNavigation: () => void; onAnalytics: () => void; onDecisions: () => void; onSource: () => void; simulationMode: boolean; connected: boolean; busy: boolean; onSimulation: () => void }) {
+export function TopBar({ sectionTitle, factoryView, plant, kpi, sourceLabel, live, navigation, onNavigation, onAnalytics, onDecisions, onAi, onSource, simulationMode, connected, busy, onSimulation }: { sectionTitle: string; factoryView: boolean; plant: Plant; kpi: Kpi; insights: Insights; sourceLabel: string; live: boolean; navigation: boolean; onNavigation: () => void; onAnalytics: () => void; onDecisions: () => void; onAi: () => void; onSource: () => void; simulationMode: boolean; connected: boolean; busy: boolean; onSimulation: () => void }) {
   return (
     <header className="topbar" inert={navigation}>
       <div className="header-context">
@@ -19,6 +19,7 @@ export function TopBar({ sectionTitle, factoryView, plant, kpi, sourceLabel, liv
           : <button className={`demo-badge source-badge${live ? ' live' : ''}`} onClick={onSource} title="Источник данных: загрузка, live, шаблон"><span />{sourceLabel}</button>}
         <button className={`simulation-launch${simulationMode ? ' active' : ''}`} disabled={busy} aria-pressed={simulationMode} onClick={onSimulation}><Icon name={simulationMode ? 'arrow-left' : 'play'} size={14} />{simulationMode ? (factoryView ? 'Вернуться к обзору' : 'К сценарию') : 'Сценарии производства'}</button>
         <button className="icon-button header-chart" onClick={onAnalytics} aria-label={simulationMode ? 'Данные кейса' : 'Данные и аналитика'}><Icon name="chart" /></button>
+        <button className="icon-button" onClick={onAi} aria-label="ИИ-аналитик: прогноз отказов и ассистент" title="ИИ-аналитик"><Icon name="spark" /></button>
         <button className="icon-button" onClick={onDecisions} aria-label={`Центр решений · данные за ${fmtDate(kpi.date)}`} title="Центр решений"><Icon name="layers" /></button>
       </div>
     </header>

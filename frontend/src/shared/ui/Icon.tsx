@@ -29,6 +29,10 @@ const paths = {
   menu: 'M4 6h16M4 12h16M4 18h16',
   car: 'M5 17H4a1 1 0 0 1-1-1v-3.5L5.2 8.1A2 2 0 0 1 7 7h10a2 2 0 0 1 1.8 1.1l2.2 4.4V16a1 1 0 0 1-1 1h-1M9 17h6M3.5 12.5h17M9 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm10 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0',
   copy: 'M9 9h11v11H9V9ZM5 15H4V4h11v1',
+  spark: 'M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9L11 3Zm8 11 .9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14Z',
+  send: 'M21 3 10 14M21 3l-7 18-4-7-7-4 18-7Z',
+  wrench: 'M15 4a5 5 0 0 0 5 6.5L11 19.5a2.1 2.1 0 0 1-3-3L17 7.5A5 5 0 0 1 15 4Z',
+  doc: 'M6 3h9l4 4v14H6V3Zm9 0v4h4M9 12h7M9 16h7',
 } as const
 export type IconName = keyof typeof paths
 export function Icon({ name, size = 18, className, style }: { name: IconName; size?: number; className?: string; style?: CSSProperties }) {

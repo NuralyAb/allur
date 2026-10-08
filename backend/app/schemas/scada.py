@@ -31,8 +31,10 @@ class ShelveBody(BaseModel):
 
 
 class FieldBody(BaseModel):
-    action: str = Field(pattern="^(fault|estop|release|local|remote)$")
+    action: str = Field(pattern="^(fault|estop|release|local|remote|degrade|repair)$")
     code: int | None = None
+    param: str | None = Field(None, max_length=64)  # degrade: какой параметр уходит от режима
+    rate: float | None = Field(None, gt=-1000, lt=1000)  # degrade: ед./мин
 
 
 class LineCommandBody(BaseModel):

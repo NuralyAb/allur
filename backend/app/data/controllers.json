@@ -225,7 +225,29 @@
         "state": 6,
         "mode": 1,
         "remote": true,
-        "defectRate": 0.022
+        "defectRate": 0.022,
+        "quality": [
+          {
+            "param": "TipWear",
+            "kind": "above",
+            "ref": 70,
+            "scale": 15,
+            "gain": 0.8
+          },
+          {
+            "param": "WeldCurrent",
+            "kind": "dev",
+            "scale": 0.6,
+            "gain": 0.5
+          },
+          {
+            "param": "CoolantFlow",
+            "kind": "below",
+            "ref": 6.5,
+            "scale": 1.5,
+            "gain": 0.5
+          }
+        ]
       }
     },
     {
@@ -381,7 +403,22 @@
         "state": 6,
         "mode": 1,
         "remote": false,
-        "defectRate": 0.02
+        "defectRate": 0.02,
+        "quality": [
+          {
+            "param": "TipWear",
+            "kind": "above",
+            "ref": 70,
+            "scale": 15,
+            "gain": 0.8
+          },
+          {
+            "param": "WeldCurrent",
+            "kind": "dev",
+            "scale": 0.6,
+            "gain": 0.5
+          }
+        ]
       }
     },
     {
@@ -539,7 +576,22 @@
         "mode": 2,
         "remote": true,
         "stopReason": 104,
-        "defectRate": 0.02
+        "defectRate": 0.02,
+        "quality": [
+          {
+            "param": "TipWear",
+            "kind": "above",
+            "ref": 70,
+            "scale": 15,
+            "gain": 0.8
+          },
+          {
+            "param": "WeldCurrent",
+            "kind": "dev",
+            "scale": 0.6,
+            "gain": 0.5
+          }
+        ]
       }
     },
     {
@@ -718,7 +770,29 @@
         "state": 6,
         "mode": 1,
         "remote": true,
-        "defectRate": 0.008
+        "defectRate": 0.008,
+        "quality": [
+          {
+            "param": "LaserPower",
+            "kind": "dev",
+            "scale": 0.2,
+            "gain": 0.6
+          },
+          {
+            "param": "ShieldGas",
+            "kind": "below",
+            "ref": 17,
+            "scale": 3,
+            "gain": 0.7
+          },
+          {
+            "param": "OpticsTemp",
+            "kind": "above",
+            "ref": 40,
+            "scale": 6,
+            "gain": 0.5
+          }
+        ]
       }
     },
     {
@@ -911,7 +985,28 @@
         "state": 6,
         "mode": 1,
         "remote": true,
-        "defectRate": 0.01
+        "defectRate": 0.01,
+        "quality": [
+          {
+            "param": "BathTemp",
+            "kind": "dev",
+            "scale": 1.2,
+            "gain": 0.6
+          },
+          {
+            "param": "Voltage",
+            "kind": "dev",
+            "scale": 12,
+            "gain": 0.4
+          },
+          {
+            "param": "Conductivity",
+            "kind": "above",
+            "ref": 1550,
+            "scale": 120,
+            "gain": 0.6
+          }
+        ]
       }
     },
     {
@@ -1087,7 +1182,15 @@
         "state": 6,
         "mode": 1,
         "remote": true,
-        "defectRate": 0.004
+        "defectRate": 0.004,
+        "quality": [
+          {
+            "param": "Temp",
+            "kind": "dev",
+            "scale": 6,
+            "gain": 0.6
+          }
+        ]
       }
     },
     {
@@ -1280,7 +1383,28 @@
         "state": 6,
         "mode": 1,
         "remote": true,
-        "defectRate": 0.02
+        "defectRate": 0.02,
+        "quality": [
+          {
+            "param": "FilterDp",
+            "kind": "above",
+            "ref": 200,
+            "scale": 35,
+            "gain": 0.8
+          },
+          {
+            "param": "Humidity",
+            "kind": "dev",
+            "scale": 4,
+            "gain": 0.5
+          },
+          {
+            "param": "Temp",
+            "kind": "dev",
+            "scale": 1.2,
+            "gain": 0.4
+          }
+        ]
       }
     },
     {
@@ -1473,7 +1597,28 @@
         "state": 6,
         "mode": 1,
         "remote": true,
-        "defectRate": 0.043
+        "defectRate": 0.043,
+        "quality": [
+          {
+            "param": "FilterDp",
+            "kind": "above",
+            "ref": 200,
+            "scale": 35,
+            "gain": 0.8
+          },
+          {
+            "param": "Humidity",
+            "kind": "dev",
+            "scale": 4,
+            "gain": 0.5
+          },
+          {
+            "param": "Temp",
+            "kind": "dev",
+            "scale": 1.2,
+            "gain": 0.4
+          }
+        ]
       }
     },
     {
@@ -1778,7 +1923,15 @@
         "state": 6,
         "mode": 1,
         "remote": true,
-        "defectRate": 0.005
+        "defectRate": 0.005,
+        "quality": [
+          {
+            "param": "Torque",
+            "kind": "dev",
+            "scale": 5,
+            "gain": 0.6
+          }
+        ]
       }
     },
     {

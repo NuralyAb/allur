@@ -12,6 +12,8 @@ function alertTag(area: string, alerts: Alert[]) {
   const own = alerts.filter((a) => a.area === area)
   const live = own.find((a) => a.kind === 'live')
   if (live) return live.title
+  const ai = own.find((a) => a.kind === 'ai')
+  if (ai) return ai.title
   if (own.some((a) => a.kind === 'bottleneck')) return 'Узкое место'
   const q = own.find((a) => a.kind === 'quality')
   if (q) return q.title.replace(/ при норме.*/, '')
@@ -40,7 +42,8 @@ export function HallZones({
         const active = selection?.kind === 'zone' && selection.zone.id === z.id
         const level = z.kpiArea ? status[z.kpiArea] : undefined
         const tag = z.kpiArea && level && level !== 'ok' ? alertTag(z.kpiArea, alerts) : undefined
-        const live = z.kpiArea ? alerts.some((a) => a.area === z.kpiArea && a.kind === 'live') : false
+        // идущий простой и прогноз ИИ подписываются на модели и без включённых подписей
+        const live = z.kpiArea ? alerts.some((a) => a.area === z.kpiArea && (a.kind === 'live' || a.kind === 'ai')) : false
         return (
           <group key={z.id}>
             <mesh

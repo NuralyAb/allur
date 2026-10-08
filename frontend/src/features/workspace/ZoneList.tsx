@@ -3,7 +3,7 @@ import type { Insights, Level, OutdoorZone, Plant, Selection, Zone } from '../..
 import { Icon, type IconName } from '../../shared/ui/Icon'
 import './Sidebar.css'
 
-type WorkspaceView = 'factory' | 'analytics' | 'decisions' | 'sources'
+type WorkspaceView = 'factory' | 'analytics' | 'decisions' | 'ai' | 'sources'
 const GROUPS: { id: string; title: string; icon: IconName; ids: string[] }[] = [
   { id: 'supply', title: 'Поставка и склад', icon: 'box', ids: ['containers', 'ckd'] },
   { id: 'body', title: 'Кузов и окраска', icon: 'layers', ids: ['small_parts', 'welding', 'paint', 'plastic', 'pbs'] },
@@ -20,11 +20,11 @@ const LABELS: Record<string, string> = {
 }
 const STATUS: Record<Level, string> = { ok: 'В норме', warn: 'Требует внимания', bad: 'Есть отклонение' }
 
-export function ZoneList({ view, plant, status, selection, insights, open, collapsed, onToggleCollapse, onExpand, onZone, onOutdoor, onClose, onOverview, onAnalytics, onDecisions, onSource }: {
+export function ZoneList({ view, plant, status, selection, insights, open, collapsed, onToggleCollapse, onExpand, onZone, onOutdoor, onClose, onOverview, onAnalytics, onDecisions, onAi, onSource }: {
   view: WorkspaceView; plant: Plant; status: Record<string, Level>; selection: Selection; insights: Insights; open: boolean
   collapsed: boolean; onToggleCollapse: () => void; onExpand: () => void
   onZone: (z: Zone) => void; onOutdoor: (z: OutdoorZone) => void; onClose: () => void
-  onOverview: () => void; onAnalytics: () => void; onDecisions: () => void; onSource: () => void
+  onOverview: () => void; onAnalytics: () => void; onDecisions: () => void; onAi: () => void; onSource: () => void
 }) {
   const [query, setQuery] = useState('')
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set())
@@ -96,6 +96,7 @@ export function ZoneList({ view, plant, status, selection, insights, open, colla
     { id: 'factory', title: 'Завод в 3D', subtitle: 'Цеха и территория', icon: 'box', pick: onOverview },
     { id: 'analytics', title: 'Аналитика', subtitle: 'Показатели и простои', icon: 'chart', pick: onAnalytics },
     { id: 'decisions', title: 'Центр решений', subtitle: 'Отклонения и сценарии', icon: 'layers', pick: onDecisions },
+    { id: 'ai', title: 'ИИ-аналитик', subtitle: 'Прогноз отказов и ассистент', icon: 'spark', pick: onAi },
     { id: 'sources', title: 'Источники данных', subtitle: 'Импорт и подключения', icon: 'grid', pick: onSource },
   ]
   const toggle = (id: string) => setOpenGroups((current) => {

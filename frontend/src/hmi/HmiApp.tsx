@@ -4,6 +4,7 @@ import { Faceplate, type Actions } from './Faceplate'
 import { IoTable, MasterStation } from './MasterStation'
 import { Gauge, Prio, StateChip, Value, paramAlarm } from '../features/scada/parts'
 import { api, can, clock, dateTime, fmt, getToken, useScadaState, type Alarm, type AuditRow, type Command, type ControllerDef, type DowntimeEvent, type ScadaConfig, type ScadaState, type User } from '../features/scada/scada'
+import { ai, usePoll, type Maintenance, type Prediction } from '../features/ai/api'
 
 type Toast = { id: number; text: string; tone: 'ok' | 'bad' | 'info' }
 type Tab = 'alarms' | 'commands' | 'io' | 'audit' | 'events' | 'links'
@@ -29,6 +30,8 @@ export default function HmiApp() {
 
 function Hmi({ config }: { config: ScadaConfig }) {
   const { state, link, serverNow } = useScadaState()
+  // предупреждения ИИ — не тревоги ISA-18.2: квитирования не требуют и в счётчики тревог не входят
+  const aiData = usePoll(ai.maintenance, 5000).data
   const [user, setUser] = useState<User | null>(null)
   const [area, setArea] = useState<string>('all')
   const [selected, setSelected] = useState<string | null>(initialSelection)
@@ -152,9 +155,10 @@ function Hmi({ config }: { config: ScadaConfig }) {
             onLine={(line, name) => (can(user, 'operator') ? actions.line(line, name) : setLoginOpen(true))} />
         ) : (
           <>
+            <AiAdvisory data={aiData} area={area} onSelect={setSelected} />
             {config.lines.map((line) => <LineFlow key={line.id} line={line} defs={defs} state={state} onSelect={setSelected} selected={selected} />)}
             <div className="tiles">
-              {shown.map((c) => <Tile key={c.id} def={c} state={state} alarms={visibleAlarms} selected={selected === c.id} onSelect={() => setSelected(c.id)} />)}
+              {shown.map((c) => <Tile key={c.id} def={c} state={state} alarms={visibleAlarms} forecast={aiData?.predictions.find((p) => p.controller === c.id && p.severity !== 'ok')} selected={selected === c.id} onSelect={() => setSelected(c.id)} />)}
             </div>
           </>
         )}
@@ -205,7 +209,33 @@ function LineFlow({ line, defs, state, selected, onSelect }: { line: ScadaConfig
   )
 }
 
-function Tile({ def, state, alarms, selected, onSelect }: { def: ControllerDef; state: ScadaState | null; alarms: Alarm[]; selected: boolean; onSelect: () => void }) {
+/** Предупреждения ИИ для оператора: какой узел идёт к аварии и что сделать до срабатывания защиты ПЛК. */
+function AiAdvisory({ data, area, onSelect }: { data: Maintenance | null; area: string; onSelect: (id: string) => void }) {
+  if (!data) return null
+  const inArea = (a: string) => area === 'all' || a === area
+  const preds = data.predictions.filter((p) => p.severity !== 'ok' && inArea(p.area))
+  const anomalies = data.anomalies.filter((a) => inArea(a.area))
+  if (!preds.length && !anomalies.length) return null
+  return (
+    <section className="ai-advisory" aria-label="Предупреждения ИИ">
+      <h2><Icon name="spark" size={15} />Прогноз ИИ <small>предупреждения, не тревоги ПЛК</small></h2>
+      <ul>
+        {preds.slice(0, 4).map((p) => <li key={`${p.controller}.${p.param}`} className={`sev-${p.severity}`}>
+          <button onClick={() => onSelect(p.controller)}><b>{p.equipment}</b>
+            <span>{p.paramName}: {fmt(p.value, p.decimals)} → {fmt(p.limit, p.decimals)} {p.unit} · {p.etaMin !== null ? `${p.failure.toLowerCase()} через ~${Math.round(p.etaMin)} мин` : `риск ${Math.round(p.probability * 100)}% за час`}</span>
+            <small>{p.action}</small></button>
+        </li>)}
+        {anomalies.slice(0, 3).map((a) => <li key={`a.${a.controller}.${a.param}`} className="sev-warn">
+          <button onClick={() => onSelect(a.controller)}><b>{a.equipment}</b>
+            <span>Аномалия: {a.paramName.toLowerCase()} {fmt(a.value, a.decimals)} {a.unit} при норме {fmt(a.expected, a.decimals)} ({a.shiftSigma > 0 ? '+' : ''}{fmt(a.shiftSigma, 1)}σ)</span>
+            <small>Тревоги ПЛК ещё нет — осмотрите узел.</small></button>
+        </li>)}
+      </ul>
+    </section>
+  )
+}
+
+function Tile({ def, state, alarms, forecast, selected, onSelect }: { def: ControllerDef; state: ScadaState | null; alarms: Alarm[]; forecast?: Prediction; selected: boolean; onSelect: () => void }) {
   const st = state?.controllers[def.id]
   const own = alarms.filter((a) => a.controller === def.id)
   const top = [...own].sort((a, b) => a.priority - b.priority)[0]
@@ -233,6 +263,7 @@ function Tile({ def, state, alarms, selected, onSelect }: { def: ControllerDef; 
         {st?.remote === false && <span className="flag">Местный</span>}
         {st?.safety === false && <span className="flag bad">Цепь безоп.</span>}
         {top && <span className="tile-alarm-text"><Prio alarm={top} compact />{own.length > 1 ? `${own.length} тревоги` : top.message.split('.')[0]}</span>}
+        {forecast && <span className={`tile-ai sev-${forecast.severity}`}><Icon name="spark" size={12} />ИИ: {forecast.etaMin !== null ? `${forecast.failure.toLowerCase()} через ~${Math.round(forecast.etaMin)} мин` : `риск отказа ${Math.round(forecast.probability * 100)}%`}</span>}
       </span>
     </button>
   )

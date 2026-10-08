@@ -18,3 +18,16 @@ CASE_FILE = PROJECT_DIR / "docs" / "case" / "Кейс_Цифровой_двой�
 TWIN_DB = Path(os.environ.get("TWIN_DB", VAR_DIR / "twin.db"))
 
 MAX_UPLOAD = 10 * 1024 * 1024
+
+
+def _load_env(path: Path) -> None:
+    """Секреты для локального запуска (OPENAI_API_KEY) — из backend/.env; переменные окружения важнее файла."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        name, sep, value = line.strip().partition("=")
+        if sep and name and not name.startswith("#"):
+            os.environ.setdefault(name.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_env(BACKEND_DIR / ".env")
