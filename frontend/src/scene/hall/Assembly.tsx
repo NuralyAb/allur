@@ -61,6 +61,9 @@ const tunnelLight = new MeshBasicMaterial({ color: new Color(1.25, 1.3, 1.34), t
 const waterGlass = new MeshStandardMaterial({ color: '#7fb6e6', transparent: true, opacity: 0.25, roughness: 0.05, depthWrite: false })
 const dropMat = new MeshBasicMaterial({ color: '#d7ecff', transparent: true, opacity: 0.7, depthWrite: false })
 const lift = paint('#f2a900', 0.3, 0.5)
+const luminaire = new MeshStandardMaterial({ color: '#eef2f3', emissive: '#eef2f3', emissiveIntensity: 0.5 })
+const doorSkin = paint('#e9ebec', 0.5, 0.35)
+const tyreStack = paint('#17191b', 0, 0.85)
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x))
 
 /** Конвейер сборки: кузов «обрастает» стёклами и колёсами по ходу. */
@@ -131,11 +134,13 @@ function HangerFollowers({
     <group>
       {Array.from({ length: count }, (_, i) => (
         <group key={i} ref={(g) => void (hangers.current[i] = g)} visible={false}>
-          <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.15, 3.6, 0.15]} position={[-1.6, 2.6, 1.05]} />
-          <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.15, 3.6, 0.15]} position={[1.6, 2.6, 1.05]} />
-          <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.15, 3.6, 0.15]} position={[-1.6, 2.6, -1.05]} />
-          <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.15, 3.6, 0.15]} position={[1.6, 2.6, -1.05]} />
-          <mesh geometry={unitBox} material={MAT.darkSteel} scale={[3.6, 0.15, 2.3]} position={[0, 0.35, 0]} />
+          <mesh geometry={unitBox} material={MAT.yellowStruct} scale={[0.15, 3.6, 0.15]} position={[-1.6, 2.6, 1.05]} />
+          <mesh geometry={unitBox} material={MAT.yellowStruct} scale={[0.15, 3.6, 0.15]} position={[1.6, 2.6, 1.05]} />
+          <mesh geometry={unitBox} material={MAT.yellowStruct} scale={[0.15, 3.6, 0.15]} position={[-1.6, 2.6, -1.05]} />
+          <mesh geometry={unitBox} material={MAT.yellowStruct} scale={[0.15, 3.6, 0.15]} position={[1.6, 2.6, -1.05]} />
+          <mesh geometry={unitBox} material={MAT.yellowStruct} scale={[3.6, 0.15, 2.3]} position={[0, 0.35, 0]} />
+          <mesh geometry={unitBox} material={MAT.hazard} scale={[3.7, 0.16, 0.5]} position={[0, 0.35, 0]} />
+          <mesh geometry={unitBox} material={MAT.yellowStruct} scale={[3.8, 0.3, 2.5]} position={[0, 4.45, 0]} />
         </group>
       ))}
     </group>
@@ -337,14 +342,15 @@ function LineFurniture({ detailed }: { detailed: boolean }) {
         </OptionalGlb>
       </group>
       <Instanced geometry={unitBox} material={postLine} items={marks} />
-      {/* балка подвесного конвейера ветки B */}
-      <mesh geometry={unitBox} material={MAT.darkSteel} scale={[UB - UA + 8, 0.5, 0.4]} position={[(UA + UB) / 2, 6.6, -LANES[1]]} />
+      {/* балка подвесного конвейера ветки B — жёлтые конструкции, как на видео */}
+      <mesh geometry={unitBox} material={MAT.yellowStruct} scale={[UB - UA + 8, 0.5, 0.4]} position={[(UA + UB) / 2, 6.6, -LANES[1]]} />
       <mesh geometry={unitBox} material={MAT.steel} scale={[UB - UA + 8, 0.09, 0.7]} position={[(UA + UB) / 2, 6.87, -LANES[1]]} />
-      <Instanced geometry={unitBox} material={MAT.darkSteel} items={Array.from({ length: 8 }, (_, i) => UA + i * (UB - UA) / 7).flatMap((u) => [
+      <Instanced geometry={unitBox} material={MAT.yellowStruct} items={Array.from({ length: 8 }, (_, i) => UA + i * (UB - UA) / 7).flatMap((u) => [
         { p: [u, 3.35, -LANES[1] - 3.5] as [number, number, number], s: [0.18, 6.7, 0.2] as [number, number, number] },
         { p: [u, 3.35, -LANES[1] + 3.5] as [number, number, number], s: [0.18, 6.7, 0.2] as [number, number, number] },
         { p: [u, 6.65, -LANES[1]] as [number, number, number], s: [0.22, 0.3, 7.3] as [number, number, number] },
       ])} />
+      <LineDressing />
       {/* номера постов: шрифт грузится отдельно и не задерживает сцену */}
       <Suspense fallback={null}>
         {posts.map((p) => (
@@ -403,6 +409,69 @@ function LineFurniture({ detailed }: { detailed: boolean }) {
   )
 }
 
+/**
+ * Обстановка линии по видео: серые пластиковые тары и картонные коробки CKD на паллетах вдоль
+ * постов, стеллажи с шинами у поста колёс, подвесная линия дверей над веткой A (двери снимают
+ * в начале сборки и возвращают в конце), ряды линейных светильников над каждой веткой.
+ */
+function LineDressing() {
+  const items = useMemo(() => {
+    const bins: { p: [number, number, number]; s: [number, number, number] }[] = []
+    const cartons: { p: [number, number, number]; s: [number, number, number] }[] = []
+    const pallets: { p: [number, number, number]; s: [number, number, number] }[] = []
+    const tyres: { p: [number, number, number]; s: [number, number, number] }[] = []
+    const rack: { p: [number, number, number]; s: [number, number, number] }[] = []
+    const doors: { p: [number, number, number]; s: [number, number, number] }[] = []
+    const rail: { p: [number, number, number]; s: [number, number, number] }[] = []
+    const lamps: { p: [number, number, number]; s: [number, number, number] }[] = []
+    LANES.forEach((v, li) => {
+      for (let k = 0; k < 20; k++) {
+        const u = UA + (k + 0.5) * POST
+        const side = (k + li) % 2 ? 1 : -1
+        const z = -(v + side * 7.4)
+        if (k % 3 === 0) {
+          pallets.push({ p: [u, 0.07, z], s: [1.2, 0.14, 1.0] })
+          cartons.push({ p: [u, 0.6, z], s: [1.1, 0.92, 0.9] })
+          cartons.push({ p: [u + 1.3, 0.35, z], s: [1.1, 0.5, 0.9] })
+        } else {
+          for (let y = 0; y < (k % 2 ? 3 : 2); y++) bins.push({ p: [u + (k % 2 ? 0 : 0.6), 0.16 + y * 0.3, z], s: [0.6, 0.28, 0.4] })
+          bins.push({ p: [u - 1.1, 0.4, z], s: [1.0, 0.8, 1.0] })
+        }
+      }
+      for (let u = UA - 2; u <= UB + 2; u += 8) lamps.push({ p: [u, 7.4, -v], s: [5.5, 0.1, 0.25] })
+    })
+    // стеллажи шин у поста колёс (ветка C)
+    for (let i = 0; i < 4; i++) {
+      const u = UA + (4.5 + i) * POST
+      const z = -(LANES[2] - 5.6)
+      rack.push({ p: [u, 0.75, z], s: [2.4, 1.5, 1.1] })
+      for (let n = 0; n < 4; n++) tyres.push({ p: [u - 0.9 + n * 0.6, 0.45, z], s: [0.62, 0.62, 0.22] })
+      for (let n = 0; n < 4; n++) tyres.push({ p: [u - 0.9 + n * 0.6, 1.2, z], s: [0.62, 0.62, 0.22] })
+    }
+    // подвесная линия дверей вдоль ветки A
+    const zDoor = -(LANES[0] + 5.4)
+    rail.push({ p: [(UA + UB) / 2, 4.2, zDoor], s: [UB - UA, 0.18, 0.18] })
+    for (let u = UA + 4; u < UB; u += 24) rail.push({ p: [u, 2.1, zDoor + 0.6], s: [0.14, 4.2, 0.14] })
+    for (let u = UA + 2; u < UB; u += 3.2) {
+      rail.push({ p: [u, 3.55, zDoor], s: [0.05, 1.3, 0.05] })
+      doors.push({ p: [u, 2.3, zDoor], s: [1.1, 1.2, 0.08] })
+    }
+    return { bins, cartons, pallets, tyres, rack, doors, rail, lamps }
+  }, [])
+  return (
+    <group>
+      <Instanced geometry={unitBox} material={MAT.greyBin} items={items.bins} />
+      <Instanced geometry={unitBox} material={MAT.carton} items={items.cartons} />
+      <Instanced geometry={unitBox} material={paint('#806f58', 0, 0.88)} items={items.pallets} />
+      <Instanced geometry={unitBox} material={MAT.bluePlastic} items={items.rack} />
+      <Instanced geometry={unitCyl} material={tyreStack} items={items.tyres.map((t) => ({ ...t, rz: Math.PI / 2 }))} />
+      <Instanced geometry={unitBox} material={MAT.yellowStruct} items={items.rail} />
+      <Instanced geometry={unitBox} material={doorSkin} items={items.doors} />
+      <Instanced geometry={unitBox} material={luminaire} items={items.lamps} />
+    </group>
+  )
+}
+
 function Marriage() {
   const ref = useRef<Group>(null!)
   useProductionFrame(({ clock }) => {
@@ -410,6 +479,11 @@ function Marriage() {
   })
   return (
     <group position={[UA + 2.5 * POST, 0, -LANES[2]]}>
+      {/* жёлтый портал поста «01» с чёрно-жёлтой окантовкой — как на видео */}
+      <Instanced geometry={unitBox} material={MAT.yellowStruct} items={[
+        { p: [-2.6, 2.4, 0], s: [0.3, 4.8, 0.3] }, { p: [2.6, 2.4, 0], s: [0.3, 4.8, 0.3] }, { p: [0, 4.8, 0], s: [5.6, 0.35, 0.4] },
+      ]} />
+      <mesh geometry={unitBox} material={MAT.hazard} scale={[5.7, 0.12, 0.42]} position={[0, 4.55, 0]} />
       <mesh geometry={unitBox} material={lift} scale={[4.2, 0.3, 2.4]} position={[0, 0.15, 0]} />
       <group ref={ref}>
         <mesh geometry={unitBox} material={MAT.darkSteel} scale={[0.9, 0.7, 0.8]} position={[1.4, 0.7, 0]} />

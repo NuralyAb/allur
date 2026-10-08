@@ -1,18 +1,21 @@
-"""Производственные показатели и расчёт OEE по данным из хранилища."""
+"""Производственные показатели и расчёт OEE по данным из хранилища. Цели и окно расчёта — из настроек администратора."""
 from ..repositories import store
+from . import settings
 
 SHIFT_HOURS = 8.0
 
-TARGETS = {
-    "oee": 85.0,  # %, не менее
-    "defect": 2.0,  # %, не более
-    "downtime_critical": 60,  # мин/сутки на единицу критического оборудования
-    "monthly_output": 5500,  # авто/месяц, не менее
-    "shifts": 2,
-}
+TARGETS = settings.DEFAULT_TARGETS  # значения по умолчанию; действующие — targets()
 
-# окно для сводки по участкам: при живом источнике история растёт
+
+def targets() -> dict:
+    return settings.targets()
+
+# окно для сводки по участкам: при живом источнике история растёт (по умолчанию; действующее — window_days())
 WINDOW_DAYS = 7
+
+
+def window_days() -> int:
+    return settings.calc()["windowDays"]
 
 
 def current() -> dict:
@@ -45,14 +48,15 @@ def line_metrics(row: dict, ds: dict) -> dict:
 
 def downtime_events(ds: dict) -> list[dict]:
     """Daily equipment totals, rather than comparing an area's sum to the limit."""
+    limit = targets()["downtime_critical"]
     return [
         {
             **event,
             "dailyMinutes": sum(d["minutes"] for d in ds["downtime"]
                                 if (d["date"], d["equipment"]) == (event["date"], event["equipment"])),
-            "limit": TARGETS["downtime_critical"],
+            "limit": limit,
             "overLimit": sum(d["minutes"] for d in ds["downtime"]
-                             if (d["date"], d["equipment"]) == (event["date"], event["equipment"])) > TARGETS["downtime_critical"],
+                             if (d["date"], d["equipment"]) == (event["date"], event["equipment"])) > limit,
         }
         for event in ds["downtime"]
     ]
@@ -66,13 +70,14 @@ def summary(ds: dict | None = None) -> dict:
     assembly = next((r for r in last if r["area"] == "Сборка"), last[-1])
     lowest = min(last, key=lambda r: r["fact"])
     areas = {}
-    recent = sorted({r["date"] for r in rows})[-WINDOW_DAYS:]
+    recent = sorted({r["date"] for r in rows})[-window_days():]
     for r in rows:
         if r["date"] in recent:
             areas.setdefault(r["area"], []).append(r)
     month_plan = sum(m["plan"] for m in ds["monthPlan"])
+    t = targets()
     return {
-        "targets": TARGETS,
+        "targets": t,
         "date": last_date,
         "rows": rows,
         "areas": {a: sorted(v, key=lambda r: r["date"]) for a, v in areas.items()},
@@ -87,8 +92,8 @@ def summary(ds: dict | None = None) -> dict:
         },
         "flowMinimum": {"area": lowest["area"], "fact": lowest["fact"]},
         "downtimeEvents": downtime_events(ds),
-        "monthPlan": {"models": ds["monthPlan"], "total": month_plan, "target": TARGETS["monthly_output"],
-                      "gap": max(0, TARGETS["monthly_output"] - month_plan)},
+        "monthPlan": {"models": ds["monthPlan"], "total": month_plan, "target": t["monthly_output"],
+                      "gap": max(0, t["monthly_output"] - month_plan)},
         "meta": {
             "demo": True,
             "source": ds["source"],

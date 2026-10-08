@@ -7,10 +7,17 @@ export interface ParamDef {
   trip: { above?: number; below?: number; code: number } | null
   permissive: { command: string; belowSp: number; text?: string } | null
 }
+export interface SignalDef {
+  id: string; name: string; kind: 'DI' | 'DO' | 'AI' | 'AO'; address: string; device: string
+  src: string | null; param: string | null; unit: string; range: [number, number]
+}
+export interface CabinetDef { id: string; location: string; plc: string; io: string; drive: string | null }
+export interface Station { name?: string; location?: string; server?: string; network?: string; redundancy?: string }
 export interface ControllerDef {
   id: string; equipment: string; name: string; zone: string; area: string; connection: string; path: string
   speed: { value: number; min?: number; max?: number; maxStep?: number; unit: string }
   writeEnabled: boolean; faults: Record<string, string>; params: ParamDef[]
+  cabinet: CabinetDef | null; io: SignalDef[]
 }
 export interface ScadaConfig {
   writeEnabled: boolean; mode: string; note: string; simulator: boolean
@@ -20,13 +27,16 @@ export interface ScadaConfig {
   states: Record<string, string>
   modes: Record<string, { value: number; label: string }>
   commands: { name: string; label: string; confirm: boolean; role: string }[]
+  lineCommands: { name: 'START' | 'STOP' | 'HOLD'; label: string; confirm: boolean }[]
   roles: Record<string, string>
+  station: Station
 }
 export interface ControllerState {
   comm: 'good' | 'stale' | 'bad'; commText: string; state: number; stateName: string; mode: number | null
   speed: number | null; speedSp: number | null; processed: number | null; defective: number | null
   stopReason: number; stopText: string; remote: boolean | null; safety: boolean | null
   params: Record<string, { pv: number | null; q: string; sp: number | null }>
+  io: Record<string, { raw: number | boolean | null; value: number | boolean | null; q: string }>
   commands: Record<string, { blocked: string | null; confirm: boolean }>
   modeBlocked: string | null; writeBlocked: string | null
 }
@@ -36,10 +46,22 @@ export interface Alarm {
   shelvedUntil: number | null; shelvedBy: string | null; shelveReason: string | null
 }
 export interface Command {
-  id: string; controller: string; kind: 'packml' | 'mode' | 'setpoint' | 'speed'; name: string; value: number | null
+  id: string; controller: string; kind: 'packml' | 'mode' | 'setpoint' | 'speed' | 'line'; name: string; value: number | null
   label: string; user: string; role: string; reason: string
   status: 'new' | 'armed' | 'sent' | 'done' | 'failed' | 'rejected' | 'expired' | 'cancelled'
   message: string; created: number; updated: number; expires: number | null
+  steps: { controller: string; label: string; status: 'done' | 'failed' | 'rejected' | 'skipped'; message: string }[]
+}
+export interface ServerStatus {
+  started: number; uptime: number; mode: string; tags: number; values: number; signals: number
+  controllers: number; online: number; connections: number; connectionsOk: number
+  updatesPerSec: number; updates: number; scanMs: number; clients: number
+  alarmsActive: number; alarmsUnacked: number; commandsPending: number; lineRuns: number
+  historyRows?: number; auditRows?: number; dbBytes?: number; writeEnabled: boolean; station: Station
+}
+export interface IoRow {
+  controller: string; equipment: string; area: string; cabinet: string; id: string; name: string; kind: SignalDef['kind']
+  address: string; device: string; tag: string; raw: number | boolean | null; value: number | boolean | null; unit: string; q: string; ts: number | null
 }
 export interface ScadaState {
   ts: number; version: number; mode: string; writeEnabled: boolean
@@ -47,6 +69,7 @@ export interface ScadaState {
   controllers: Record<string, ControllerState>
   alarms: Alarm[]; commands: Command[]
   buffers: { up: string; down: string; size: number; fill: number }[]
+  server: ServerStatus
 }
 export interface User { login: string; name: string; role: 'viewer' | 'operator' | 'engineer'; roleName: string; guest?: boolean }
 export interface AuditRow { seq: number; ts: number; kind: string; user: string; role: string; controller: string; action: string; detail: Record<string, unknown>; status: string; hash: string }
@@ -100,6 +123,9 @@ export const api = {
   },
   command: (controller: string, kind: Command['kind'], name: string, value?: number) =>
     call<Command>('/commands', { controller, kind, name, ...(value !== undefined && { value }) }),
+  lineCommand: (line: string, name: 'START' | 'STOP' | 'HOLD') => call<Command>(`/lines/${encodeURIComponent(line)}/commands`, { name }),
+  server: () => call<ServerStatus>('/server'),
+  io: () => call<IoRow[]>('/io'),
   confirm: (id: string, reason: string) => call<Command>(`/commands/${id}/confirm`, { reason }),
   cancel: (id: string) => call<Command>(`/commands/${id}/cancel`, {}),
   ack: (id?: string, controller?: string) => call<{ acked: number }>('/alarms/ack', { id, controller }),

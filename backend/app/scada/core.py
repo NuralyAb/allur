@@ -21,8 +21,8 @@ from uuid import uuid4
 
 from . import auth
 from .drivers import Driver, OpcUaDriver, SimDriver, key
-from .packml import (COMMAND_RU, ENERGIZING, MODE_CHANGE_STATES, MODE_RU, OPERATOR_COMMANDS, SAFE_COMMANDS, STATE_RU,
-                     TRANSITIONS, Command, Mode, State, allowed, hint)
+from .packml import (ACTING, COMMAND_RU, ENERGIZING, MODE_CHANGE_STATES, MODE_RU, OPERATOR_COMMANDS, SAFE_COMMANDS,
+                     STATE_RU, STOPPABLE, TRANSITIONS, Command, Mode, State, allowed, hint)
 from .registry import Controller, Registry
 
 DEFAULT_DB = Path(os.environ.get("SCADA_DB", Path(__file__).resolve().parents[2] / "data" / "scada.db"))
@@ -32,6 +32,8 @@ STALE_SECONDS = 5  # счётчик жизни ПЛК не меняется до
 log = logging.getLogger("scada")
 HISTORY_DAYS = float(os.environ.get("SCADA_HISTORY_DAYS", 7))
 PRIORITY_RU = {1: "Высокий", 2: "Средний", 3: "Низкий"}
+LINE_COMMANDS = {"START": "Пуск линии", "STOP": "Остановка линии", "HOLD": "Удержание линии"}
+STATS_SECONDS = 10  # как часто пересчитывать размер историка и журнала для сводки станции
 LIMIT_TEXT = {"hihi": ("Очень высокое значение", 1), "hi": ("Высокое значение", 2), "lo": ("Низкое значение", 2),
               "lolo": ("Очень низкое значение", 1), "dev": ("Отклонение от уставки", 2)}
 
@@ -79,6 +81,21 @@ class Cmd:
     updated: float = field(default_factory=time.time)
     expires: float | None = None
     guard: dict = field(default_factory=dict)
+    steps: list = field(default_factory=list)  # для команд линии: ход выполнения по контроллерам
+
+
+@dataclass
+class LineRun:
+    """Групповая команда с центрального пульта: контроллеры линии проходят по очереди, каждый — через те же проверки.
+
+    Пуск идёт с конца линии к началу (сначала ОТК, потом сборка…), чтобы не заполнять буферы;
+    остановка и удержание — с начала к концу. Контроллер, у которого команда заблокирована, пропускается,
+    остальные продолжают: линия поднимается настолько, насколько позволяют блокировки на месте.
+    """
+    cmd: Cmd
+    order: list[str]
+    index: int = 0
+    child: str | None = None
 
 
 class Db:
@@ -161,6 +178,13 @@ class Db:
         with self.lock, self.db:
             self.db.execute("UPDATE events SET end = ? WHERE id = ?", (end, eid))
 
+    def stats(self) -> dict:
+        with self.lock:
+            hist = self.db.execute("SELECT COUNT(*) FROM history").fetchone()[0]
+            audit = self.db.execute("SELECT COUNT(*) FROM audit").fetchone()[0]
+            pages = self.db.execute("PRAGMA page_count").fetchone()[0] * self.db.execute("PRAGMA page_size").fetchone()[0]
+        return {"historyRows": hist, "auditRows": audit, "dbBytes": pages}
+
     def events(self, limit=100) -> list[dict]:
         with self.lock:
             rows = [dict(r) for r in self.db.execute("SELECT * FROM events ORDER BY id DESC LIMIT ?", (limit,))]
@@ -184,10 +208,19 @@ class Scada:
         self.drivers: dict[str, Driver] = {}
         self.version = 0
         self.task: asyncio.Task | None = None
+        self.started = time.time()
+        self.clients = 0  # открытых потоков состояния (пульты, двойник)
+        self.updates = 0  # принятых изменений тегов с запуска
+        self.rate = 0.0  # изменений тегов в секунду за последние 5 с
+        self._rate_mark = (time.time(), 0)
+        self.scan_ms = 0.0  # длительность последнего цикла тревог
+        self.line_runs: dict[str, LineRun] = {}
+        self._stats: tuple[float, dict] = (0.0, {})
 
     # --- связь с драйверами --------------------------------------------------------------------
     def _on_values(self, batch):
         self.values.update(batch)
+        self.updates += len(batch)
         self.version += 1
 
     def _on_status(self, conn_id, ok, text):
@@ -236,7 +269,10 @@ class Scada:
             await asyncio.sleep(0.5)
             tick += 1
             try:  # цикл тревог не должен останавливаться из-за одной ошибки
+                t0 = time.perf_counter()
                 self.evaluate()
+                await self.line_tick()
+                self.scan_ms = (time.perf_counter() - t0) * 1000
                 if tick % 4 == 0:
                     self.record_history()
                 if tick % 7200 == 0:
@@ -529,12 +565,15 @@ class Scada:
         if cmd.status != "armed":
             raise CommandError(f"Команда уже в статусе «{cmd.status}»")
         cmd.reason = reason.strip() or cmd.reason
-        if cmd.kind != "packml" and not cmd.reason:
+        if cmd.kind not in ("packml", "line") and not cmd.reason:
             raise CommandError("Укажите причину изменения — она попадёт в журнал", 422)
-        c = self.registry.controllers[cmd.controller]
         if time.time() > cmd.expires:
             self._finish(cmd, "expired", "Время подтверждения истекло")
             raise CommandError("Время подтверждения истекло — подайте команду заново")
+        if cmd.kind == "line":
+            await self._start_line(cmd)
+            return cmd
+        c = self.registry.controllers[cmd.controller]
         if self._guard(c, cmd.kind, cmd.name) != cmd.guard:
             self._finish(cmd, "rejected", "Состояние оборудования изменилось после выбора команды")
             raise CommandError("Состояние оборудования изменилось — проверьте и подайте команду заново")
@@ -588,7 +627,7 @@ class Scada:
         for cmd in self.commands.values():
             if cmd.status == "armed" and now > cmd.expires:
                 self._finish(cmd, "expired", "Не подтверждена за 20 с")
-            elif cmd.status == "sent":
+            elif cmd.status == "sent" and cmd.kind != "line":
                 c = self.registry.controllers[cmd.controller]
                 if self._done(c, cmd):
                     self._finish(cmd, "done", "Выполнена: ПЛК подтвердил")
@@ -607,6 +646,147 @@ class Scada:
             if old not in self.recent:
                 del self.commands[old]
         self.version += 1
+
+    # --- команды линии с центрального пульта --------------------------------------------------
+    def line(self, line_id: str) -> dict:
+        line = next((l for l in self.registry.lines if l["id"] == line_id), None)
+        if line is None:
+            raise CommandError("Линия не найдена", 404)
+        return line
+
+    async def request_line(self, user: auth.User, line_id: str, name: str, reason: str = "") -> Cmd:
+        line = self.line(line_id)
+        if name not in LINE_COMMANDS:
+            raise CommandError("Команда линии не поддерживается", 422)
+        if not auth.allows(user.role, "operator"):
+            raise CommandError(f"Нужна роль «{auth.ROLE_RU['operator']}»")
+        cmd = Cmd(uuid4().hex[:12], line_id, "line", name, None, LINE_COMMANDS[name], user.login, user.role, reason.strip(), "new")
+        if not self.registry.write_enabled:
+            cmd.status, cmd.message = "rejected", "Управление выключено: режим только чтения (ввод в эксплуатацию)"
+            self._remember(cmd)
+            self._audit_cmd(cmd, "rejected")
+            raise CommandError(cmd.message)
+        self._remember(cmd)
+        if Command[name] not in SAFE_COMMANDS:
+            cmd.status, cmd.expires = "armed", time.time() + ARM_SECONDS
+            cmd.message = f"Ожидает подтверждения: {len(line['controllers'])} контроллеров"
+            self._audit_cmd(cmd, "armed")
+            return cmd
+        await self._start_line(cmd)
+        return cmd
+
+    async def _start_line(self, cmd: Cmd):
+        order = list(self.line(cmd.controller)["controllers"])
+        if cmd.name == "START":
+            order.reverse()  # с конца линии: сначала потребители, потом поставщики
+        cmd.status, cmd.message, cmd.updated = "sent", f"Выполняется: 1 из {len(order)}", time.time()
+        self._audit_cmd(cmd, "sent", {"order": order})
+        self.line_runs[cmd.id] = LineRun(cmd, order)
+        self.version += 1
+        await self.line_tick()
+
+    def _line_next(self, c: Controller, goal: str) -> str | None:
+        """Какую команду PackML подать контроллеру, чтобы приблизить его к цели; None — цель достигнута; wait — идёт переход."""
+        state = self.state(c)
+        if state in ACTING:
+            return "wait"
+        if goal == "START":
+            return {State.ABORTED: "CLEAR", State.STOPPED: "RESET", State.COMPLETE: "RESET", State.IDLE: "START",
+                    State.HELD: "UNHOLD"}.get(state)
+        if goal == "STOP":
+            return "STOP" if state in STOPPABLE else None
+        return "HOLD" if state in (State.EXECUTE, State.SUSPENDED) else None
+
+    async def line_tick(self):
+        """Шаг групповых команд: ждём подтверждения ПЛК по текущему шагу и подаём следующий."""
+        for run in list(self.line_runs.values()):
+            cmd = run.cmd
+            while run.index < len(run.order):
+                cid = run.order[run.index]
+                c = self.registry.controllers[cid]
+                if run.child:
+                    child = self.commands.get(run.child)
+                    if child and child.status == "sent":
+                        break
+                    run.child = None
+                    ok = child is not None and child.status == "done"
+                    cmd.steps.append({"controller": cid, "label": child.label if child else "", "status": "done" if ok else "failed",
+                                      "message": child.message if child else "команда потеряна"})
+                    if not ok:
+                        run.index += 1
+                        continue
+                step = self._line_next(c, cmd.name)
+                if step == "wait":
+                    break
+                if step is None:  # цель достигнута; если шагов не было — контроллер уже был в нужном состоянии
+                    if not any(st["controller"] == cid for st in cmd.steps):
+                        cmd.steps.append({"controller": cid, "label": "", "status": "skipped", "message": f"уже {STATE_RU[self.state(c)].lower()}"})
+                    run.index += 1
+                    continue
+                blocked = self.check(c, "packml", step, role=cmd.role)
+                if blocked:
+                    cmd.steps.append({"controller": cid, "label": COMMAND_RU[Command[step]], "status": "rejected", "message": blocked})
+                    self.db.audit("command", cmd.user, cmd.role, cid, f"{cmd.label}: {COMMAND_RU[Command[step]]}",
+                                  {"command": cmd.id, "reason": blocked}, "rejected")
+                    run.index += 1
+                    continue
+                child = Cmd(uuid4().hex[:12], cid, "packml", step, None, f"{cmd.label} · {COMMAND_RU[Command[step]]}",
+                            cmd.user, cmd.role, cmd.reason, "new", guard=self._guard(c, "packml", step))
+                self._remember(child)
+                run.child = child.id
+                try:
+                    await self._execute(c, child)
+                except CommandError:
+                    continue  # шаг записан как failed, итог — на следующем проходе цикла
+                cmd.message, cmd.updated = f"Выполняется: {run.index + 1} из {len(run.order)} — {c.equipment}: {COMMAND_RU[Command[step]]}", time.time()
+                break
+            if run.index >= len(run.order):
+                del self.line_runs[cmd.id]
+                bad = [s for s in cmd.steps if s["status"] in ("failed", "rejected")]
+                acted = [s for s in cmd.steps if s["status"] == "done"]
+                names = ", ".join(f"{self.registry.controllers[s['controller']].equipment} ({s['message']})" for s in bad)
+                if bad and not acted:
+                    self._finish(cmd, "failed", f"Ни один контроллер не выполнил команду: {names}")
+                elif bad:
+                    self._finish(cmd, "done", f"Выполнено для {len(acted)} контроллеров; пропущены: {names}")
+                else:
+                    self._finish(cmd, "done", f"Выполнена: {len(acted)} контроллеров, пропущено без действий {len(cmd.steps) - len(acted)}")
+        self.version += 1
+
+    # --- сводка центрального пульта ------------------------------------------------------------
+    def server_status(self) -> dict:
+        now = time.time()
+        if now - self._stats[0] > STATS_SECONDS:
+            self._stats = (now, self.db.stats())
+        if now - self._rate_mark[0] >= 5:
+            self.rate = (self.updates - self._rate_mark[1]) / (now - self._rate_mark[0])
+            self._rate_mark = (now, self.updates)
+        online = sum(1 for c in self.registry.controllers.values() if self.comm(c)[0] == "good")
+        return {
+            "started": self.started, "uptime": now - self.started, "mode": self.mode,
+            "tags": sum(len(c.read_tags()) for c in self.registry.controllers.values()), "values": len(self.values),
+            "signals": sum(len(c.io) for c in self.registry.controllers.values()),
+            "controllers": len(self.registry.controllers), "online": online,
+            "connections": len(self.conn), "connectionsOk": sum(1 for c in self.conn.values() if c["ok"]),
+            "updatesPerSec": round(self.rate, 1), "updates": self.updates, "scanMs": round(self.scan_ms, 1),
+            "clients": self.clients,
+            "alarmsActive": sum(1 for a in self.alarms.values() if a.active), "alarmsUnacked": sum(1 for a in self.alarms.values() if not a.acked),
+            "commandsPending": sum(1 for c in self.commands.values() if c.status in ("armed", "sent")),
+            "lineRuns": len(self.line_runs), **self._stats[1],
+            "writeEnabled": self.registry.write_enabled, "station": self.registry.station,
+        }
+
+    def io_rows(self) -> list[dict]:
+        """База сигналов станции: все клеммы всех шкафов с текущими значениями."""
+        rows = []
+        for c in self.registry.controllers.values():
+            for sig in c.io:
+                val = self.values.get(key(c.id, f"IO.{sig.id}"))
+                raw, q, ts = (val[0], val[1], val[2]) if val else (None, "bad", None)
+                rows.append({"controller": c.id, "equipment": c.equipment, "area": c.area, "cabinet": c.cabinet.id if c.cabinet else "",
+                             "id": sig.id, "name": sig.name, "kind": sig.kind, "address": sig.address, "device": sig.device,
+                             "tag": f"{c.path}.IO.{sig.id}", "raw": raw, "value": sig.scale(raw), "unit": sig.unit, "q": q, "ts": ts})
+        return rows
 
     # --- историк -----------------------------------------------------------------------------
     def record_history(self):
@@ -639,6 +819,10 @@ class Scada:
                 pv = self.values.get(key(c.id, f"Status.Parameter.{p.id}"))
                 params[p.id] = {"pv": pv[0] if pv else None, "q": pv[1] if pv else "bad",
                                 "sp": self.v(c.id, f"Status.Setpoint.{p.id}") if p.sp else None}
+            io = {}
+            for sig in c.io:
+                val = self.values.get(key(c.id, f"IO.{sig.id}"))
+                io[sig.id] = {"raw": val[0] if val else None, "value": sig.scale(val[0]) if val else None, "q": val[1] if val else "bad"}
             commands = {}
             for cmd in OPERATOR_COMMANDS:
                 commands[cmd.name] = {"blocked": self.check(c, "packml", cmd.name), "confirm": self.needs_confirm("packml", cmd.name)}
@@ -650,7 +834,7 @@ class Scada:
                 "defective": self.v(c.id, "Admin.ProdDefectiveCount"), "stopReason": self.v(c.id, "Admin.StopReason", 0),
                 "stopText": self.registry.fault_text(c, int(self.v(c.id, "Admin.StopReason", 0) or 0)),
                 "remote": self.v(c.id, "Interlock.Remote"), "safety": self.v(c.id, "Interlock.SafetyOk"),
-                "params": params, "commands": commands, "modeBlocked": mode_block,
+                "params": params, "io": io, "commands": commands, "modeBlocked": mode_block,
                 "writeBlocked": None if self.registry.write_enabled and c.writeEnabled else "Режим только чтения",
             }
         alarms = sorted(self.alarms.values(), key=lambda a: (a.acked, a.priority, -a.since))
@@ -661,6 +845,7 @@ class Scada:
             "alarms": [asdict(a) for a in alarms],
             "commands": [self._public_cmd(self.commands[i]) for i in self.recent if i in self.commands],
             "buffers": self.sim.buffers() if self.sim else [],
+            "server": self.server_status(),
         }
 
     @staticmethod

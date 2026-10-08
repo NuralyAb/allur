@@ -12,6 +12,7 @@ import math
 from functools import lru_cache
 
 from ..config import DATA_DIR as DATA
+from . import settings
 
 SOURCES = {
     "nur": {
@@ -282,5 +283,17 @@ OUTDOOR = [
 ]
 
 
-def plant() -> dict:
+def original() -> dict:
+    """Паспорт по открытым источникам, без правок администратора."""
     return {**PLANT, "hall": hall_frame(), "zones": ZONES, "outdoor": OUTDOOR, "sources": SOURCES}
+
+
+def plant() -> dict:
+    """Паспорт с правками администратора: имя, адрес, факты, поля участков и площадок (см. services.settings)."""
+    o = settings.plant_overrides()
+    zones = [{**z, **{k: v for k, v in o.get("zones", {}).get(z["id"], {}).items() if k in settings.ZONE_FIELDS}} for z in ZONES]
+    outdoor = [{**z, **{k: v for k, v in o.get("outdoor", {}).get(z["id"], {}).items() if k in settings.OUTDOOR_FIELDS}} for z in OUTDOOR]
+    head = {**PLANT, **{k: o[k] for k in ("name", "address") if o.get(k)}}
+    if o.get("facts"):
+        head["facts"] = o["facts"]
+    return {**head, "hall": hall_frame(), "zones": zones, "outdoor": outdoor, "sources": SOURCES, "customized": bool(o)}

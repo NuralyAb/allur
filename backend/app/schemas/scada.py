@@ -33,3 +33,9 @@ class ShelveBody(BaseModel):
 class FieldBody(BaseModel):
     action: str = Field(pattern="^(fault|estop|release|local|remote)$")
     code: int | None = None
+
+
+class LineCommandBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(pattern="^(START|STOP|HOLD)$")
+    reason: str = Field("", max_length=300)

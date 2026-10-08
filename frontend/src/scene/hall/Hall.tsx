@@ -16,18 +16,22 @@ import { MAT, unitBox, unitCyl } from '../core/assets'
 import { surfaceTile } from '../core/surfaces'
 
 const glassWall = new MeshStandardMaterial({ color: '#859da9', metalness: 0.15, roughness: 0.18, transparent: true, opacity: 0.48, depthWrite: false })
-const skylight = new MeshStandardMaterial({ color: '#64808b', roughness: 0.25, metalness: 0.38 })
+const skylight = new MeshStandardMaterial({ color: '#dfe6e9', roughness: 0.3, metalness: 0.2 })
 const concreteTexture = surfaceTile('concrete', 1 / 12)
 const roofTexture = surfaceTile('roof', 1 / 10)
-const epoxy = new MeshStandardMaterial({ color: '#9ea6a5', map: concreteTexture, bumpMap: concreteTexture, bumpScale: 0.018, roughness: 0.77, metalness: 0.025 })
-const roofFinish = new MeshStandardMaterial({ color: '#697c80', map: roofTexture, bumpMap: roofTexture, bumpScale: 0.045, roughness: 0.73, metalness: 0.22 })
+// Пол как на видео с завода: светлый наливной, глянцевый, с отражениями светильников.
+const epoxy = new MeshStandardMaterial({ color: '#c2c7c6', map: concreteTexture, bumpMap: concreteTexture, bumpScale: 0.01, roughness: 0.38, metalness: 0.04 })
+// Кровля светлая: на аэросъёмке корпус белый с частой сеткой зенитных фонарей.
+const roofFinish = new MeshStandardMaterial({ color: '#c6ccce', map: roofTexture, bumpMap: roofTexture, bumpScale: 0.045, roughness: 0.7, metalness: 0.12 })
+const aisleLine = new MeshStandardMaterial({ color: '#f1c40f', roughness: 0.55, metalness: 0.05 })
+const aisleWhite = new MeshStandardMaterial({ color: '#e8ebea', roughness: 0.55, metalness: 0.05 })
 const trim = new MeshStandardMaterial({ color: '#42525c', roughness: 0.52, metalness: 0.45 })
 const panelRib = new MeshStandardMaterial({ color: '#afb9bd', roughness: 0.68, metalness: 0.18 })
 const led = new MeshStandardMaterial({ color: '#dfe8e9', emissive: '#dfe8e9', emissiveIntensity: 0.55 })
 const servicePanel = new MeshStandardMaterial({ color: '#879497', roughness: 0.72, metalness: 0.26 })
 const shutter = new MeshStandardMaterial({ color: '#647175', map: roofTexture, roughness: 0.69, metalness: 0.35 })
 
-type HallItem = { p: [number, number, number]; s: [number, number, number] }
+type HallItem = { p: [number, number, number]; s: [number, number, number]; r?: number; rz?: number }
 
 /** Roof services share geometry; their scale reads correctly in the site overview. */
 function RoofServices({ units, height }: { units: HallItem[]; height: number }) {
@@ -97,6 +101,71 @@ export const COLUMN_V = [86, 110, 134, 170]
 const COLUMN_CLEAR = [[218, 334, 88, 204]]
 const clear = (u: number, v: number) => COLUMN_CLEAR.some(([u0, u1, v0, v1]) => u > u0 && u < u1 && v > v0 && v < v1)
 
+/**
+ * Жёлтая разметка проходов, как на видео: сплошные линии по краям магистральных проходов,
+ * белая «зебра» на пересечениях. Проходы разделяют цеха (см. ZONES в backend/app/services/plant.py).
+ */
+const AISLE_W = 4
+/** Продольные проходы (v, u0, u1) — между сваркой и сборкой, между сборкой и складом CKD. */
+const AISLES_U: [number, number, number][] = [[83, 4, 300], [192.5, 58, 218]]
+/** Поперечные проходы (u, v0, v1) — у западных цехов, между сборкой и окраской, выезд ОТК. */
+const AISLES_V: [number, number, number][] = [[58.5, 4, 192], [217, 4, 194], [247, 4, 88]]
+function FloorMarking() {
+  const { lines, zebra } = useMemo(() => {
+    const lines: HallItem[] = []
+    const zebra: HallItem[] = []
+    for (const [v, u0, u1] of AISLES_U)
+      for (const side of [-1, 1]) lines.push({ p: [(u0 + u1) / 2, 0.05, -(v + side * AISLE_W / 2)], s: [u1 - u0, 0.012, 0.12] })
+    for (const [u, v0, v1] of AISLES_V)
+      for (const side of [-1, 1]) lines.push({ p: [u + side * AISLE_W / 2, 0.05, -(v0 + v1) / 2], s: [0.12, 0.012, v1 - v0] })
+    // пешеходные переходы на пересечениях проходов
+    for (const [v] of AISLES_U)
+      for (const [u, v0, v1] of AISLES_V) {
+        if (v < v0 || v > v1) continue
+        for (let k = -3; k <= 3; k++) zebra.push({ p: [u + AISLE_W / 2 + 1.2, 0.05, -(v + k * 0.55)], s: [1.6, 0.012, 0.28] })
+      }
+    return { lines, zebra }
+  }, [])
+  return <group>
+    <Instanced geometry={unitBox} material={aisleLine} items={lines} />
+    <Instanced geometry={unitBox} material={aisleWhite} items={zebra} />
+  </group>
+}
+
+/**
+ * Светлые решётчатые фермы покрытия: нижний пояс вдоль рядов колонн, поперечные фермы с шагом
+ * колонн и раскосы. На видео они задают весь вид цеха; сверху это тонкие линии и обзор не закрывают.
+ */
+function RoofTrusses({ frame, height }: { frame: HallFrame; height: number }) {
+  const items = useMemo(() => {
+    const chords: HallItem[] = []
+    const web: HallItem[] = []
+    const depth = 1.6
+    const top = height - 0.3
+    const bottom = top - depth
+    const length = frame.length - 8
+    for (const v of COLUMN_V) {
+      chords.push({ p: [frame.length / 2, top, -v], s: [length, 0.22, 0.3] })
+      chords.push({ p: [frame.length / 2, bottom, -v], s: [length, 0.18, 0.26] })
+      for (let u = 6; u < frame.length - 4; u += 3) {
+        web.push({ p: [u, (top + bottom) / 2, -v], s: [0.09, depth, 0.09] })
+        web.push({ p: [u + 1.5, (top + bottom) / 2, -v], s: [0.07, Math.hypot(depth, 3), 0.07], r: 0, rz: Math.atan2(3, depth) })
+      }
+    }
+    const span = frame.width - 8
+    for (const u of COLUMN_U) {
+      chords.push({ p: [u, top, -frame.width / 2], s: [0.3, 0.22, span] })
+      chords.push({ p: [u, bottom, -frame.width / 2], s: [0.26, 0.18, span] })
+      for (let v = 6; v < frame.width - 4; v += 3) web.push({ p: [u, (top + bottom) / 2, -v], s: [0.09, depth, 0.09] })
+    }
+    return { chords, web }
+  }, [frame, height])
+  return <group>
+    <Instanced geometry={unitBox} material={MAT.truss} items={items.chords} />
+    <Instanced geometry={unitBox} material={MAT.truss} items={items.web} />
+  </group>
+}
+
 function shapeUV(poly: XY[]) {
   const s = new Shape()
   s.moveTo(poly[0][0], poly[0][1])
@@ -114,7 +183,7 @@ export function Instanced({
 }: {
   geometry: BufferGeometry
   material: Material
-  items: { p: [number, number, number]; s?: [number, number, number]; r?: number }[]
+  items: { p: [number, number, number]; s?: [number, number, number]; r?: number; rz?: number }[]
   castShadow?: boolean
 }) {
   const ref = useRef<InstancedMesh>(null!)
@@ -122,7 +191,7 @@ export function Instanced({
     const o = new Object3D()
     items.forEach((it, i) => {
       o.position.set(...it.p)
-      o.rotation.set(0, it.r ?? 0, 0)
+      o.rotation.set(0, it.r ?? 0, it.rz ?? 0)
       o.scale.set(...(it.s ?? [1, 1, 1]))
       o.updateMatrix()
       ref.current.setMatrixAt(i, o.matrix)
@@ -186,9 +255,14 @@ export function Hall({ frame, outline, roof }: Props) {
         out.push({ p: [u, H + 1.2, -v], s: [4.8, 1.5, 3.2] })
     return out
   }, [frame, H])
-  const lights = useMemo(() => COLUMN_U.flatMap((u) => COLUMN_V.filter((v) => !clear(u, v)).map((v) => ({
-    p: [u + 1.5, H - 1.1, -v] as [number, number, number], s: [5, 0.12, 0.32] as [number, number, number],
-  }))), [H])
+  // Ряды линейных светильников через каждые 12 м вдоль рядов колонн и между ними — как на видео.
+  const lights = useMemo(() => {
+    const rows = [...COLUMN_V, 50, 160, 200]
+    const out: HallItem[] = []
+    for (let u = 12; u < frame.length - 8; u += 12)
+      for (const v of rows) if (!clear(u, v)) out.push({ p: [u, H - 2.2, -v], s: [6, 0.1, 0.3] })
+    return out
+  }, [H, frame.length])
   return (
     <group>
       <mesh geometry={floorGeo} material={epoxy} position={[0, 0.03, 0]} receiveShadow />
@@ -211,9 +285,15 @@ export function Hall({ frame, outline, roof }: Props) {
         </group>
       ))}
 
-      <Instanced geometry={unitBox} material={MAT.darkSteel} items={columns} castShadow />
+      <Instanced geometry={unitBox} material={MAT.lightColumn} items={columns} castShadow />
       <Instanced geometry={unitBox} material={panelRib} items={facadeRibs} />
-      {!roof && <Instanced geometry={unitBox} material={led} items={lights} />}
+      <FloorMarking />
+      {!roof && (
+        <>
+          <Instanced geometry={unitBox} material={led} items={lights} />
+          <RoofTrusses frame={frame} height={H} />
+        </>
+      )}
 
       {roof && (
         <group>

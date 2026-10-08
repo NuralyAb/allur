@@ -8,10 +8,10 @@ import time
 from fastapi import APIRouter, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 
 from ..scada import auth
-from ..scada.core import Scada
+from ..scada.core import LINE_COMMANDS, Scada
 from ..scada.packml import COMMAND_RU, MODE_RU, OPERATOR_COMMANDS, SAFE_COMMANDS, STATE_RU, Mode
 from ..scada.runtime import fail, rt, scada, token_of, user_of
-from ..schemas.scada import AckBody, CommandBody, ConfirmBody, FieldBody, Login, ShelveBody
+from ..schemas.scada import AckBody, CommandBody, ConfirmBody, FieldBody, LineCommandBody, Login, ShelveBody
 
 router = APIRouter(prefix="/api/scada", tags=["scada"])
 
@@ -24,8 +24,21 @@ def get_config() -> dict:
         **s.registry.public(), "mode": s.mode, "note": rt.note,
         "states": {int(k): v for k, v in STATE_RU.items()}, "modes": {m.name: {"value": int(m), "label": MODE_RU[m]} for m in Mode},
         "commands": [{"name": c.name, "label": COMMAND_RU[c], "confirm": c not in SAFE_COMMANDS, "role": "operator"} for c in OPERATOR_COMMANDS],
+        "lineCommands": [{"name": k, "label": v, "confirm": k == "START"} for k, v in LINE_COMMANDS.items()],
         "roles": auth.ROLE_RU, "simulator": rt.sim is not None,
     }
+
+
+@router.get("/server")
+def get_server() -> dict:
+    """Сводка центрального пульта: сервер, теги, подключения, историк, клиенты."""
+    return scada().server_status()
+
+
+@router.get("/io")
+def get_io() -> list[dict]:
+    """База сигналов: все полевые входы и выходы всех шкафов с текущими значениями."""
+    return scada().io_rows()
 
 
 @router.get("/state")
@@ -78,6 +91,17 @@ async def post_command(body: CommandBody, authorization: str | None = Header(Non
     user = user_of(authorization, "operator")
     try:
         cmd = await scada().request(user, body.controller, body.kind, body.name, body.value, body.reason)
+    except Exception as e:
+        fail(e)
+    return Scada._public_cmd(cmd)
+
+
+@router.post("/lines/{line_id}/commands")
+async def post_line_command(line_id: str, body: LineCommandBody, authorization: str | None = Header(None)) -> dict:
+    """Групповая команда линии с центрального пульта: пуск (с подтверждением), остановка или удержание."""
+    user = user_of(authorization, "operator")
+    try:
+        cmd = await scada().request_line(user, line_id, body.name, body.reason)
     except Exception as e:
         fail(e)
     return Scada._public_cmd(cmd)
@@ -175,6 +199,8 @@ def post_field(cid: str, body: FieldBody, authorization: str | None = Header(Non
 async def stream(ws: WebSocket):
     """Снимок состояния два раза в секунду."""
     await ws.accept()
+    if rt.scada:
+        rt.scada.clients += 1
     try:
         while True:
             if rt.scada is None:
@@ -184,3 +210,6 @@ async def stream(ws: WebSocket):
             await asyncio.sleep(0.5)
     except (WebSocketDisconnect, RuntimeError):
         return
+    finally:
+        if rt.scada:
+            rt.scada.clients -= 1

@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../shared/ui/Icon'
 import { Faceplate, type Actions } from './Faceplate'
+import { IoTable, MasterStation } from './MasterStation'
 import { Gauge, Prio, StateChip, Value, paramAlarm } from '../features/scada/parts'
 import { api, can, clock, dateTime, fmt, getToken, useScadaState, type Alarm, type AuditRow, type Command, type ControllerDef, type DowntimeEvent, type ScadaConfig, type ScadaState, type User } from '../features/scada/scada'
 
 type Toast = { id: number; text: string; tone: 'ok' | 'bad' | 'info' }
-type Tab = 'alarms' | 'commands' | 'audit' | 'events' | 'links'
+type Tab = 'alarms' | 'commands' | 'io' | 'audit' | 'events' | 'links'
+type View = 'line' | 'station'
 const AREAS = ['Сварка', 'Окраска', 'Сборка', 'ОТК']
 
 function initialSelection() {
   return new URLSearchParams(location.search).get('c')
+}
+function initialView(): View {
+  return new URLSearchParams(location.search).get('view') === 'station' ? 'station' : 'line'
 }
 
 export default function HmiApp() {
@@ -31,15 +36,17 @@ function Hmi({ config }: { config: ScadaConfig }) {
   const [loginOpen, setLoginOpen] = useState(false)
   const [shelving, setShelving] = useState<Alarm | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
-  const [tab, setTab] = useState<Tab>('alarms')
+  const [view, setView] = useState<View>(initialView)
+  const [tab, setTab] = useState<Tab>(() => (initialView() === 'station' ? 'io' : 'alarms'))
   const toastId = useRef(0)
 
   useEffect(() => { if (getToken()) api.me().then((u) => setUser(u.guest ? null : u), () => setUser(null)) }, [])
   useEffect(() => {
     const url = new URL(location.href)
     if (selected) url.searchParams.set('c', selected); else url.searchParams.delete('c')
+    if (view === 'station') url.searchParams.set('view', 'station'); else url.searchParams.delete('view')
     history.replaceState(null, '', url)
-  }, [selected])
+  }, [selected, view])
 
   const toast = useCallback((text: string, tone: Toast['tone'] = 'info') => {
     const id = ++toastId.current
@@ -69,6 +76,11 @@ function Hmi({ config }: { config: ScadaConfig }) {
     login: () => setLoginOpen(true),
     field: (cid, action, code) => void guard(() => api.field(cid, action, code), 'Событие на линии смоделировано'),
     explain: (text) => toast(text, 'info'),
+    line: (line, name) => void guard(async () => {
+      const cmd = await api.lineCommand(line, name)
+      if (cmd.status === 'armed') setArmed(cmd)
+      else toast(`${cmd.label} — выполняется`, 'ok')
+    }),
   }), [guard, toast, defs])
 
   const alarms = state?.alarms ?? []
@@ -118,7 +130,7 @@ function Hmi({ config }: { config: ScadaConfig }) {
       </section>
 
       <nav className="hmi-areas" aria-label="Участки">
-        {['all', ...AREAS].map((a) => {
+        {view === 'line' && ['all', ...AREAS].map((a) => {
           const ids = config.controllers.filter((c) => a === 'all' || c.area === a).map((c) => c.id)
           const worst = Math.min(4, ...visibleAlarms.filter((x) => ids.includes(x.controller)).map((x) => x.priority))
           return (
@@ -128,14 +140,25 @@ function Hmi({ config }: { config: ScadaConfig }) {
             </button>
           )
         })}
+        <div className="hmi-views" role="group" aria-label="Экран">
+          <button aria-pressed={view === 'line'} onClick={() => { setView('line'); setTab('alarms') }}>Линия</button>
+          <button aria-pressed={view === 'station'} onClick={() => { setView('station'); setTab('io') }}>Диспетчерская{state && state.server.online < state.server.controllers && <Prio alarm={{ priority: 1, acked: true, active: true }} compact />}</button>
+        </div>
       </nav>
 
       <main className="hmi-main">
-        {config.lines.map((line) => <LineFlow key={line.id} line={line} defs={defs} state={state} onSelect={setSelected} selected={selected} />)}
-        <div className="tiles">
-          {shown.map((c) => <Tile key={c.id} def={c} state={state} alarms={visibleAlarms} selected={selected === c.id} onSelect={() => setSelected(c.id)} />)}
-        </div>
-        <Journal tab={tab} onTab={setTab} state={state} defs={defs} config={config} user={user} actions={actions} onSelect={setSelected} />
+        {view === 'station' ? (
+          <MasterStation config={config} state={state} alarms={visibleAlarms} user={user} selected={selected} onSelect={setSelected}
+            onLine={(line, name) => (can(user, 'operator') ? actions.line(line, name) : setLoginOpen(true))} />
+        ) : (
+          <>
+            {config.lines.map((line) => <LineFlow key={line.id} line={line} defs={defs} state={state} onSelect={setSelected} selected={selected} />)}
+            <div className="tiles">
+              {shown.map((c) => <Tile key={c.id} def={c} state={state} alarms={visibleAlarms} selected={selected === c.id} onSelect={() => setSelected(c.id)} />)}
+            </div>
+          </>
+        )}
+        <Journal tab={tab} onTab={setTab} state={state} defs={defs} config={config} user={user} actions={actions} onSelect={setSelected} area={view === 'station' ? 'all' : area} />
       </main>
 
       {selectedDef && state && (
@@ -146,7 +169,7 @@ function Hmi({ config }: { config: ScadaConfig }) {
       )}
 
       {loginOpen && <LoginDialog demo={config.simulator} onClose={() => setLoginOpen(false)} onLogin={(u) => { setUser(u); setLoginOpen(false); toast(`Вход: ${u.name} (${u.roleName})`, 'ok') }} />}
-      {armed && <ConfirmDialog cmd={armed} def={defs.get(armed.controller)!} state={state} serverNow={serverNow} onClose={() => setArmed(null)} onDone={(text) => { setArmed(null); toast(text, 'ok') }} />}
+      {armed && <ConfirmDialog cmd={armed} def={defs.get(armed.controller)} line={config.lines.find((l) => l.id === armed.controller)} state={state} serverNow={serverNow} onClose={() => setArmed(null)} onDone={(text) => { setArmed(null); toast(text, 'ok') }} />}
       {shelving && <ShelveDialog alarm={shelving} onClose={() => setShelving(null)} onDone={() => { setShelving(null); toast('Тревога отложена — запись в журнале', 'ok') }} onError={(t) => toast(t, 'bad')} />}
       <div className="toasts" aria-live="assertive">{toasts.map((t) => <div key={t.id} className={`toast toast-${t.tone}`}>{t.text}</div>)}</div>
     </div>
@@ -215,7 +238,9 @@ function Tile({ def, state, alarms, selected, onSelect }: { def: ControllerDef; 
   )
 }
 
-function Journal({ tab, onTab, state, defs, config, user, actions, onSelect }: { tab: Tab; onTab: (t: Tab) => void; state: ScadaState | null; defs: Map<string, ControllerDef>; config: ScadaConfig; user: User | null; actions: Actions; onSelect: (id: string) => void }) {
+function Journal({ tab, onTab, state, defs, config, user, actions, onSelect, area }: { tab: Tab; onTab: (t: Tab) => void; state: ScadaState | null; defs: Map<string, ControllerDef>; config: ScadaConfig; user: User | null; actions: Actions; onSelect: (id: string) => void; area: string }) {
+  const [ioArea, setIoArea] = useState('all')
+  const [ioKind, setIoKind] = useState('all')
   const [audit, setAudit] = useState<AuditRow[] | null>(null)
   const [verify, setVerify] = useState<{ ok: boolean; rows: number } | null>(null)
   const [events, setEvents] = useState<DowntimeEvent[] | null>(null)
@@ -229,8 +254,10 @@ function Journal({ tab, onTab, state, defs, config, user, actions, onSelect }: {
     const t = setInterval(load, 5000)
     return () => { alive = false; clearInterval(t) }
   }, [tab])
-  const tabs: [Tab, string][] = [['alarms', `Тревоги (${state?.alarms.length ?? 0})`], ['commands', 'Команды'], ['audit', 'Журнал аудита'], ['events', 'Простои по ПЛК'], ['links', 'Связь']]
-  const name = (cid: string) => defs.get(cid)?.equipment ?? cid
+  const signals = config.controllers.reduce((n, c) => n + c.io.length, 0)
+  const tabs: [Tab, string][] = [['alarms', `Тревоги (${state?.alarms.length ?? 0})`], ['commands', 'Команды'], ['io', `Сигналы I/O (${signals})`], ['audit', 'Журнал аудита'], ['events', 'Простои по ПЛК'], ['links', 'Связь']]
+  const name = (cid: string) => defs.get(cid)?.equipment ?? config.lines.find((l) => l.id === cid)?.name ?? cid
+  const ioControllers = config.controllers.map((c) => (ioKind === 'all' ? c : { ...c, io: c.io.filter((s) => s.kind === ioKind) }))
   return (
     <section className="journal" id="journal">
       <div className="journal-tabs" role="tablist">
@@ -259,11 +286,25 @@ function Journal({ tab, onTab, state, defs, config, user, actions, onSelect }: {
             <thead><tr><th>Время</th><th>Оборудование</th><th>Команда</th><th>Кто</th><th>Причина</th><th>Результат</th></tr></thead>
             <tbody>
               {(state?.commands ?? []).map((c) => (
-                <tr key={c.id} className={`status-${c.status}`}><td>{clock(c.updated)}</td><td>{name(c.controller)}</td><td>{c.label}</td><td>{c.user}</td><td>{c.reason || '—'}</td><td>{c.message}</td></tr>
+                <tr key={c.id} className={`status-${c.status}`}><td>{clock(c.updated)}</td><td>{c.kind === 'line' ? 'Линия' : name(c.controller)}</td><td>{c.label}</td><td>{c.user}</td><td>{c.reason || '—'}</td><td>{c.message}</td></tr>
               ))}
               {!state?.commands.length && <tr><td colSpan={6} className="empty">Команд в этой смене не было</td></tr>}
             </tbody>
           </table>
+        )}
+        {tab === 'io' && (
+          <>
+            <div className="io-filter">
+              <span>База сигналов станции: что подключено к клеммам каждого шкафа и что ПЛК отдаёт серверу под тегом <code>IO.&lt;id&gt;</code>.</span>
+              <select aria-label="Участок" value={ioArea === 'all' && area !== 'all' ? area : ioArea} onChange={(e) => setIoArea(e.target.value)}>
+                <option value="all">Все участки</option>{AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <select aria-label="Вид сигнала" value={ioKind} onChange={(e) => setIoKind(e.target.value)}>
+                <option value="all">DI · DO · AI · AO</option><option value="DI">DI — дискретные входы</option><option value="DO">DO — дискретные выходы</option><option value="AI">AI — аналоговые входы</option><option value="AO">AO — аналоговые выходы</option>
+              </select>
+            </div>
+            <IoTable controllers={ioControllers} state={state} area={ioArea === 'all' && area !== 'all' ? area : ioArea} onSelect={onSelect} />
+          </>
         )}
         {tab === 'audit' && (
           <>
@@ -300,7 +341,7 @@ function Journal({ tab, onTab, state, defs, config, user, actions, onSelect }: {
                 return <tr key={c.id}><td>{c.name}</td><td>{c.protocol.toUpperCase()}</td><td><code>{c.endpoint}</code></td><td className={s?.ok ? '' : 'bad'}>{s?.text ?? '—'}</td><td>{s ? clock(s.since) : '—'}</td></tr>
               })}</tbody>
             </table>
-            <p className="fp-meta">Контроллеров: {config.controllers.length}. Каждый отдаёт интерфейс PackML: состояние, режим, скорость, счётчики, код останова, ключ «Местный/Дистанционный», цепь безопасности, параметры процесса и уставки.</p>
+            <p className="fp-meta">Контроллеров: {config.controllers.length}, полевых сигналов: {signals}. Каждый ПЛК отдаёт интерфейс PackML (состояние, режим, скорость, счётчики, код останова, ключ «Местный/Дистанционный», цепь безопасности, параметры и уставки) и образ своих клемм (IO). {config.station.network}</p>
           </div>
         )}
       </div>
@@ -345,7 +386,7 @@ function LoginDialog({ demo, onClose, onLogin }: { demo: boolean; onClose: () =>
   )
 }
 
-function ConfirmDialog({ cmd, def, state, serverNow, onClose, onDone }: { cmd: Command; def: ControllerDef; state: ScadaState | null; serverNow: () => number; onClose: () => void; onDone: (text: string) => void }) {
+function ConfirmDialog({ cmd, def, line, state, serverNow, onClose, onDone }: { cmd: Command; def?: ControllerDef; line?: ScadaConfig['lines'][number]; state: ScadaState | null; serverNow: () => number; onClose: () => void; onDone: (text: string) => void }) {
   const ref = useModal()
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -356,7 +397,8 @@ function ConfirmDialog({ cmd, def, state, serverNow, onClose, onDone }: { cmd: C
     return () => clearInterval(t)
   }, [cmd.expires, serverNow])
   const st = state?.controllers[cmd.controller]
-  const needReason = cmd.kind !== 'packml'
+  const needReason = cmd.kind !== 'packml' && cmd.kind !== 'line'
+  const lineStates = line ? line.controllers.map((cid) => state?.controllers[cid]) : []
   const cancel = () => { void api.cancel(cmd.id).catch(() => null); onClose() }
   const confirm = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -364,7 +406,7 @@ function ConfirmDialog({ cmd, def, state, serverNow, onClose, onDone }: { cmd: C
     setError(null)
     try {
       await api.confirm(cmd.id, reason)
-      onDone(`${def.equipment}: ${cmd.label} — отправлена в ПЛК`)
+      onDone(def ? `${def.equipment}: ${cmd.label} — отправлена в ПЛК` : `${cmd.label} — выполняется по очереди`)
     } catch (err) {
       setError((err as Error).message)
     } finally { setBusy(false) }
@@ -374,13 +416,22 @@ function ConfirmDialog({ cmd, def, state, serverNow, onClose, onDone }: { cmd: C
       <form onSubmit={confirm}>
         <span className="fp-kicker">Второй шаг · подтверждение</span>
         <h2 id="confirm-title">{cmd.label}</h2>
-        <p><b>{def.equipment}</b> — {def.name}</p>
-        <dl className="confirm-facts">
-          <div><dt>Сейчас</dt><dd>{st?.stateName ?? '—'}</dd></div>
-          <div><dt>Пульт</dt><dd>{st?.remote ? 'Дистанционный' : 'Местный'}</dd></div>
-          <div><dt>Цепь безопасности</dt><dd>{st?.safety ? 'Норма' : 'Разомкнута'}</dd></div>
-        </dl>
-        <p className="fp-meta">Перед подтверждением убедитесь, что в зоне оборудования нет людей. Если состояние изменится, ПЛК команду не получит.</p>
+        {def ? <p><b>{def.equipment}</b> — {def.name}</p> : <p><b>{line?.name}</b></p>}
+        {def ? (
+          <dl className="confirm-facts">
+            <div><dt>Сейчас</dt><dd>{st?.stateName ?? '—'}</dd></div>
+            <div><dt>Пульт</dt><dd>{st?.remote ? 'Дистанционный' : 'Местный'}</dd></div>
+            <div><dt>Цепь безопасности</dt><dd>{st?.safety ? 'Норма' : 'Разомкнута'}</dd></div>
+          </dl>
+        ) : (
+          <dl className="confirm-facts">
+            <div><dt>Контроллеров</dt><dd>{line?.controllers.length ?? '—'}</dd></div>
+            <div><dt>Местное управление</dt><dd>{lineStates.filter((s) => s?.remote === false).length}</dd></div>
+            <div><dt>Цепь разомкнута</dt><dd>{lineStates.filter((s) => s?.safety === false).length}</dd></div>
+          </dl>
+        )}
+        <p className="fp-meta">{def ? 'Перед подтверждением убедитесь, что в зоне оборудования нет людей. Если состояние изменится, ПЛК команду не получит.'
+          : 'Контроллеры запускаются по очереди с конца линии, каждый — через проверки роли, ключа, цепи безопасности и разрешений пуска. Заблокированные пропускаются, результат виден в шагах команды.'}</p>
         <label>Причина{needReason ? ' (обязательно)' : ''}<input autoFocus value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} placeholder={needReason ? 'например: по техкарте, заявка №…' : 'необязательно'} required={needReason} /></label>
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="dialog-actions">

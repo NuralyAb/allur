@@ -58,6 +58,13 @@ const boothGlass = new MeshStandardMaterial({ color: '#cfe3f1', transparent: tru
 const boothLight = new MeshBasicMaterial({ color: new Color(1.15, 1.15, 1.1), toneMapped: false })
 const ovenGlow = new MeshBasicMaterial({ color: new Color(1.2, 0.55, 0.22), toneMapped: false })
 const ovenSkin = paint('#c3c8cd', 0.85, 0.3)
+// По видео: белые стеновые панели окрасочного корпуса с лентой окон, жёлтые площадки и перила,
+// роботы в сине-голубых защитных чехлах, световой туннель контроля на выходе.
+const panelWall = paint('#e3e6e7', 0.1, 0.72)
+const panelGlass = new MeshStandardMaterial({ color: '#b9d3e2', transparent: true, opacity: 0.45, roughness: 0.1, metalness: 0.2, depthWrite: false })
+const robotCover = paint('#2f9ec4', 0.05, 0.75)
+const grating = paint('#d7b43a', 0.3, 0.6)
+const tunnelLamp = new MeshBasicMaterial({ color: new Color(1.25, 1.3, 1.34), toneMapped: false })
 
 function dip(u: number) {
   let y = 0
@@ -137,8 +144,8 @@ function Tanks() {
   }, [])
   return (
     <group>
-      <Instanced geometry={unitBox} material={MAT.steel} items={details.steel} />
-      <Instanced geometry={unitBox} material={paint('#bea267', 0.3, 0.5)} items={details.safety} />
+      <Instanced geometry={unitBox} material={grating} items={details.steel} />
+      <Instanced geometry={unitBox} material={MAT.yellowStruct} items={details.safety} />
       {TANKS.map((c, k) => (
         <group key={k} position={[c, 0, -V1]}>
           {/* борта ванны */}
@@ -222,7 +229,7 @@ function Booth({ u0, u1, label, robotsPerSide }: { u0: number; u1: number; label
             position={[-len / 2 + step * (i + 0.5), 0.6, side * 3]}
             yaw={side === 1 ? Math.PI / 2 : -Math.PI / 2}
             tool="spray"
-            material={MAT.wall}
+            material={robotCover}
             phase={i * 1.3 + side}
             speed={0.9}
             scale={0.85}
@@ -236,19 +243,55 @@ function Booth({ u0, u1, label, robotsPerSide }: { u0: number; u1: number; label
   )
 }
 
-/** Перегородки цеха окраски — отдельная «чистая» зона. */
+/** Стены цеха окраски — отдельная «чистая» зона: белые панели, лента остекления на высоте 2–3,2 м. */
 function Enclosure() {
-  const items = useMemo(
+  const walls = useMemo(
     () => [
-      { p: [213, 3, -158] as [number, number, number], s: [110, 6, 0.12] as [number, number, number] },
-      { p: [213, 3, -222] as [number, number, number], s: [110, 6, 0.12] as [number, number, number] },
+      { p: [213, 0, -158] as [number, number, number], s: [110, 1, 0.2] as [number, number, number] },
+      { p: [213, 0, -222] as [number, number, number], s: [110, 1, 0.2] as [number, number, number] },
       // проём для выхода кузовов в буфер на проходе V4
-      { p: [158, 3, -196] as [number, number, number], s: [0.12, 6, 52] as [number, number, number] },
-      { p: [268, 3, -190] as [number, number, number], s: [0.12, 6, 64] as [number, number, number] },
+      { p: [158, 0, -196] as [number, number, number], s: [0.2, 1, 52] as [number, number, number] },
+      { p: [268, 0, -190] as [number, number, number], s: [0.2, 1, 64] as [number, number, number] },
     ],
     [],
   )
-  return <Instanced geometry={unitBox} material={boothGlass} items={items} />
+  const lower = walls.map((w) => ({ p: [w.p[0], 1, w.p[2]] as [number, number, number], s: [w.s[0], 2, w.s[2]] as [number, number, number] }))
+  const glass = walls.map((w) => ({ p: [w.p[0], 2.6, w.p[2]] as [number, number, number], s: [w.s[0], 1.2, w.s[2] * 0.6] as [number, number, number] }))
+  const upper = walls.map((w) => ({ p: [w.p[0], 4.6, w.p[2]] as [number, number, number], s: [w.s[0], 2.8, w.s[2]] as [number, number, number] }))
+  return <group>
+    <Instanced geometry={unitBox} material={panelWall} items={lower} />
+    <Instanced geometry={unitBox} material={panelGlass} items={glass} />
+    <Instanced geometry={unitBox} material={panelWall} items={upper} />
+  </group>
+}
+
+/** Световой туннель контроля окраски на выходе из печи финишной сушки (видео: наклонные лампы). */
+function InspectionTunnel({ u0, u1, v }: { u0: number; u1: number; v: number }) {
+  const len = u1 - u0
+  const c = (u0 + u1) / 2
+  const n = Math.floor(len / 1.6)
+  const frames = useMemo(() => Array.from({ length: n }, (_, i) => -len / 2 + 0.8 + i * 1.6).flatMap((x) => [
+    { p: [x, 1.9, 3.1] as [number, number, number], s: [0.12, 3.8, 0.12] as [number, number, number] },
+    { p: [x, 1.9, -3.1] as [number, number, number], s: [0.12, 3.8, 0.12] as [number, number, number] },
+    { p: [x, 3.85, 0] as [number, number, number], s: [0.12, 0.12, 6.3] as [number, number, number] },
+  ]), [n, len])
+  const lamps = useMemo(() => Array.from({ length: n }, (_, i) => -len / 2 + 0.8 + i * 1.6).flatMap((x) => [
+    { p: [x, 2.0, 2.95] as [number, number, number], s: [0.1, 3.2, 0.08] as [number, number, number] },
+    { p: [x, 2.0, -2.95] as [number, number, number], s: [0.1, 3.2, 0.08] as [number, number, number] },
+    { p: [x, 3.7, 0] as [number, number, number], s: [0.1, 0.08, 5.6] as [number, number, number] },
+  ]), [n, len])
+  return (
+    <group position={[c, 0, -v]}>
+      <Instanced geometry={unitBox} material={MAT.wall} items={frames} />
+      <Instanced geometry={unitBox} material={tunnelLamp} items={lamps} />
+      <mesh geometry={unitBox} material={MAT.darkSteel} scale={[len, 0.08, 6.4]} position={[0, 0.05, 0]} />
+      <Worker position={[-len / 4, 0, 2.4]} yaw={Math.PI / 2} phase={3} outfit="paint" />
+      <Worker position={[len / 4, 0, -2.4]} yaw={-Math.PI / 2} phase={4} outfit="paint" />
+      <Label position={[0, 5.6, 0]} color="#22c3a6" small>
+        Контроль окраски · световой туннель
+      </Label>
+    </group>
+  )
 }
 
 /** Перевод собственной системы цеха в корпус: a → v = a − 66, проход p → u = 470 − p. */
@@ -262,11 +305,12 @@ export function Paint() {
       <ControlCabinets positions={[[174, 0, -172], [197, 0, -172], [229, 0, -172], [255, 0, -172]]} />
       <Oven u0={205} u1={258} v={V2} label="Печь сушки катафореза" />
       <Oven u0={176} u1={254} v={V4} label="Печь финишной сушки" />
+      <InspectionTunnel u0={154} u1={172} v={V4} />
       {/* герметизация швов */}
       {[174, 184, 194].map((u, i) => (
         <group key={u}>
-          <Worker position={[u, 0, -(V2 + 2.6)]} yaw={Math.PI / 2} phase={i} />
-          <Worker position={[u + 3, 0, -(V2 - 2.6)]} yaw={-Math.PI / 2} phase={i + 2} />
+          <Worker position={[u, 0, -(V2 + 2.6)]} yaw={Math.PI / 2} phase={i} outfit="paint" />
+          <Worker position={[u + 3, 0, -(V2 - 2.6)]} yaw={-Math.PI / 2} phase={i + 2} outfit="paint" />
         </group>
       ))}
       <Label position={[184, 4, -V2]} color="#22c3a6" small>

@@ -3,6 +3,7 @@
 Все источники — файл кейса, выгрузки MES/1С в XLSX, симулятор линии, в будущем коннекторы OPC UA/MQTT —
 пишут в одни и те же четыре таблицы. Расчёты KPI и решений читают только отсюда.
 """
+import json
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -32,6 +33,8 @@ class Store:
             for name, cols in TABLES.items():
                 self._db.execute(f'CREATE TABLE IF NOT EXISTS "{name}" ({", ".join(cols)})')
             self._db.execute("CREATE TABLE IF NOT EXISTS meta (key PRIMARY KEY, value)")
+            self._db.execute("CREATE TABLE IF NOT EXISTS settings (key PRIMARY KEY, value)")
+            self._db.execute("CREATE TABLE IF NOT EXISTS audit (ts, user, role, action, details)")
 
     def empty(self) -> bool:
         with self._lock:
@@ -68,6 +71,41 @@ class Store:
             self._db.executemany("INSERT OR REPLACE INTO meta VALUES (?, ?)", [("source", source), ("updatedAt", now)])
             self.version += 1
         return counts
+
+
+    # --- настройки администратора (JSON по секциям) ---------------------------------------------
+
+    def setting(self, key: str):
+        with self._lock:
+            row = self._db.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def settings_all(self) -> dict:
+        with self._lock:
+            rows = self._db.execute("SELECT key, value FROM settings").fetchall()
+        return {k: json.loads(v) for k, v in rows}
+
+    def set_setting(self, key: str, value) -> None:
+        with self._lock, self._db:
+            self._db.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", (key, json.dumps(value, ensure_ascii=False)))
+            self.version += 1  # интерфейс перечитывает показатели и решения по версии
+
+    def delete_setting(self, key: str) -> None:
+        with self._lock, self._db:
+            self._db.execute("DELETE FROM settings WHERE key = ?", (key,))
+            self.version += 1
+
+    # --- аудит действий в двойнике --------------------------------------------------------------
+
+    def audit(self, user: str, role: str, action: str, details: dict | None = None) -> None:
+        with self._lock, self._db:
+            self._db.execute("INSERT INTO audit VALUES (?, ?, ?, ?, ?)",
+                             (datetime.now(timezone.utc).isoformat(timespec="seconds"), user, role, action, json.dumps(details or {}, ensure_ascii=False)))
+
+    def audit_rows(self, limit: int = 200) -> list[dict]:
+        with self._lock:
+            rows = self._db.execute("SELECT rowid, ts, user, role, action, details FROM audit ORDER BY rowid DESC LIMIT ?", (limit,)).fetchall()
+        return [{"id": r[0], "ts": r[1], "user": r[2], "role": r[3], "action": r[4], "details": json.loads(r[5])} for r in rows]
 
 
 _default: Store | None = None

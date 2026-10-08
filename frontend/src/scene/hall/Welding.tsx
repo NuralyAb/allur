@@ -1,7 +1,7 @@
 import { useProductionFrame, useProductionEnabled } from '../../features/simulation/ProductionClock'
 import { useMemo, useRef } from 'react'
 import { Color, MeshBasicMaterial, MeshStandardMaterial, type Mesh } from 'three'
-import { CAR_COLORS, MAT, unitBox } from '../core/assets'
+import { CAR_COLORS, MAT, unitBox, unitCyl } from '../core/assets'
 import { Car, type CarHandle } from '../vehicles/Car'
 import { pickModel, type CarModelId } from '../vehicles/carModels'
 import { track } from '../vehicles/carUnits'
@@ -31,9 +31,13 @@ const SLOTS = 10 // 9 сварочных постов + рихтовка/гео�
 const PERIOD = 9 // такт демонстрации, с
 const MOVE = 2.6 // время переезда, с
 
-const fenceMat = new MeshStandardMaterial({ color: '#7b888b', alphaMap: fenceTile(), alphaTest: 0.4, roughness: 0.6, metalness: 0.4 })
-const laserCellMat = new MeshStandardMaterial({ color: '#25292f', transparent: true, opacity: 0.55, roughness: 0.3, depthWrite: false })
+// Как на видео: жёлтые сетчатые ограждения ячеек, красные сварочные шторы лазерной ячейки.
+const fenceMat = new MeshStandardMaterial({ color: '#f0c224', alphaMap: fenceTile(), alphaTest: 0.4, roughness: 0.55, metalness: 0.2 })
+const laserCellMat = new MeshStandardMaterial({ color: '#c8402a', transparent: true, opacity: 0.6, roughness: 0.5, depthWrite: false })
 const laserWindow = new MeshBasicMaterial({ color: new Color(1.1, 0.12, 0.08), toneMapped: false, transparent: true, opacity: 0.45, depthWrite: false })
+const jigMat = new MeshStandardMaterial({ color: '#6f7d74', roughness: 0.6, metalness: 0.45 })
+/** Посты с роботами; остальные — ручная контактная сварка подвесными клещами на балансирах (видео). */
+const ROBOT_POSTS = new Set([2, 6])
 const scanMat = new MeshBasicMaterial({ color: new Color(0.2, 3, 0.6), toneMapped: false })
 
 function Line({ index, v, model, note, car }: { index: number; v: number; model: string; note: string; car: CarModelId | null }) {
@@ -63,10 +67,19 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
     for (let k = 0; k < SLOTS - 1; k++) {
       const u = U0 + k * PITCH
       const isLaser = laser && (k === 5 || k === 6)
-      const n = isLaser ? 2 : k % 3 === 0 ? 1 : 2
+      if (!isLaser && !ROBOT_POSTS.has(k)) continue
+      const n = isLaser ? 2 : 1
       for (let j = 0; j < n; j++)
         for (const side of [1, -1] as const)
           out.push({ u: u + (n === 2 ? (j ? 2.2 : -2.2) : 0), side, tool: isLaser ? 'laser' : 'gun' })
+    }
+    return out
+  }, [laser])
+  const manual = useMemo(() => {
+    const out: { u: number; side: 1 | -1 }[] = []
+    for (let k = 0; k < SLOTS - 1; k++) {
+      if (ROBOT_POSTS.has(k) || (laser && (k === 5 || k === 6))) continue
+      for (const side of [1, -1] as const) out.push({ u: U0 + k * PITCH + (side === 1 ? 1.2 : -1.2), side })
     }
     return out
   }, [laser])
@@ -86,6 +99,35 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
       out.push({ p: [u, 1.1, -(v + side * 5.6)], s: [0.1, 2.2, 0.1] })
     return out
   }, [v, uEnd])
+  // Верхний ярус линии, как на видео: три красные магистрали (сжатый воздух, вода охлаждения,
+  // шинопровод), жёлтый монорельс с балансирами и свисающими кабелями сварочных клещей.
+  const overhead = useMemo(() => {
+    const len = uEnd - U0 + 8
+    const cu = (U0 + uEnd) / 2
+    const pipes = [7.2, 7.65, 8.1].map((h, i) => ({ p: [cu, h, -(v + 1.4 - i * 0.5)] as [number, number, number], s: [0.2, len, 0.2] as [number, number, number], rz: Math.PI / 2 }))
+    const yellow: { p: [number, number, number]; s: [number, number, number] }[] = []
+    const dark: { p: [number, number, number]; s: [number, number, number] }[] = []
+    const jigs: { p: [number, number, number]; s: [number, number, number] }[] = []
+    for (const side of [1, -1]) {
+      yellow.push({ p: [cu, 4.9, -(v + side * 2.6)], s: [len, 0.32, 0.36] })
+      for (let u = U0 - 4; u <= uEnd + 4; u += PITCH) {
+        yellow.push({ p: [u, 2.45, -(v + side * 5.4)], s: [0.22, 4.9, 0.22] })
+        yellow.push({ p: [u, 4.9, -(v + side * 4)], s: [0.22, 0.26, 3] })
+      }
+    }
+    for (const m of manual) {
+      const z = -(v + m.side * 2.6)
+      yellow.push({ p: [m.u, 4.45, z], s: [0.5, 0.55, 0.4] })
+      dark.push({ p: [m.u, 2.9, z], s: [0.05, 2.6, 0.05] })
+      dark.push({ p: [m.u, 1.45, z + m.side * 0.1], s: [0.32, 0.5, 0.22] })
+    }
+    for (let k = 0; k < SLOTS - 1; k++) {
+      const u = U0 + k * PITCH
+      jigs.push({ p: [u, 0.25, -v], s: [4.6, 0.5, 2.3] })
+      for (const side of [1, -1]) jigs.push({ p: [u, 0.95, -(v + side * 1.35)], s: [3.8, 0.9, 0.25] })
+    }
+    return { pipes, yellow, dark, jigs }
+  }, [v, uEnd, manual])
 
   return (
     <group>
@@ -93,6 +135,13 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
       <ControlCabinets positions={[U0 + 12, U0 + 42, U0 + 72].map((u) => [u, 0, -v + 6.5])} />
       <Instanced geometry={unitBox} material={fenceMat} items={fence} />
       <Instanced geometry={unitBox} material={MAT.yellow} items={posts} />
+      <Instanced geometry={unitCyl} material={MAT.redPipe} items={overhead.pipes} />
+      <Instanced geometry={unitBox} material={MAT.yellowStruct} items={overhead.yellow} />
+      <Instanced geometry={unitBox} material={MAT.cable} items={overhead.dark} />
+      <Instanced geometry={unitBox} material={jigMat} items={overhead.jigs} />
+      {manual.map((m, i) => (
+        <Worker key={i} position={[m.u, 0, -(v + m.side * 2.2)]} yaw={m.side === 1 ? Math.PI / 2 : -Math.PI / 2} phase={i * 0.7 + index} />
+      ))}
 
       {!simulated && Array.from({ length: SLOTS }, (_, i) => (
         <Car key={i} ref={(c) => void (cars.current[i] = c)} model={car ?? pickModel(i)} unit={units[i]} />
@@ -112,10 +161,11 @@ function Line({ index, v, model, note, car }: { index: number; v: number; model:
 
       {laser && (
         <group position={[U0 + 5.5 * PITCH, 0, -v]}>
-          {/* закрытая ячейка лазерной сварки */}
-          <mesh geometry={unitBox} material={laserCellMat} scale={[22, 4.2, 0.1]} position={[0, 2.1, 5.4]} />
-          <mesh geometry={unitBox} material={laserCellMat} scale={[22, 4.2, 0.1]} position={[0, 2.1, -5.4]} />
-          <mesh geometry={unitBox} material={laserCellMat} scale={[22, 0.1, 10.8]} position={[0, 4.2, 0]} />
+          {/* ячейка лазерной сварки за красными сварочными шторами (видео) */}
+          <mesh geometry={unitBox} material={laserCellMat} scale={[22, 3.6, 0.1]} position={[0, 1.9, 5.4]} />
+          <mesh geometry={unitBox} material={laserCellMat} scale={[22, 3.6, 0.1]} position={[0, 1.9, -5.4]} />
+          <mesh geometry={unitBox} material={MAT.steel} scale={[22.4, 0.12, 0.12]} position={[0, 3.75, 5.4]} />
+          <mesh geometry={unitBox} material={MAT.steel} scale={[22.4, 0.12, 0.12]} position={[0, 3.75, -5.4]} />
           <mesh geometry={unitBox} material={laserWindow} scale={[16, 0.6, 0.12]} position={[0, 2.4, 5.45]} />
           <mesh geometry={unitBox} material={laserWindow} scale={[16, 0.6, 0.12]} position={[0, 2.4, -5.45]} />
         </group>

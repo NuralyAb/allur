@@ -8,10 +8,11 @@
 """
 from math import ceil
 
-from . import kpi
+from . import kpi, settings
 
 FLOW = ["Сварка", "Окраска", "Сборка"]
 # будни октября 2026 без 26.10 (перенос выходного за День Республики, выпавший на воскресенье)
+# значения по умолчанию; действующие — из настроек администратора (services.settings)
 WORK_DAYS = 21
 PREDICTIVE_CUT = 0.5  # допущение: предиктивное обслуживание предотвращает половину внеплановых простоев
 
@@ -58,7 +59,7 @@ def _n(x: float) -> str:
 
 def window(ds: dict) -> dict:
     """Последние WINDOW_DAYS дней: решения принимаются по свежему темпу, а не по всей истории."""
-    dates = set(sorted({r["date"] for r in ds["lines"]})[-kpi.WINDOW_DAYS:])
+    dates = set(sorted({r["date"] for r in ds["lines"]})[-kpi.window_days():])
     return {**ds, **{k: [r for r in ds[k] if r["date"] in dates] for k in ("lines", "downtime", "quality")}}
 
 
@@ -95,14 +96,14 @@ def area_base(ds: dict) -> dict:
 
 def _levers(base: dict) -> list[dict]:
     """Мероприятия, которые можно включить в сценарий. Каждое меняет параметры модели участков."""
-    target = kpi.TARGETS["defect"] / 100
+    target = kpi.targets()["defect"] / 100
     levers = []
     for area, a in base.items():
         if a["defectRate"] > target:
             levers.append({
                 "id": f"quality:{area}",
                 "area": area,
-                "title": f"Брак {GENITIVE[area]} до нормы {kpi.TARGETS['defect']:g}%",
+                "title": f"Брак {GENITIVE[area]} до нормы {kpi.targets()['defect']:g}%",
                 "detail": f"Сейчас {_n(a['defectRate'] * 100)}%. Каждый дефект — кузов, не прошедший участок с первого раза.",
                 "set": {area: {"defectRate": target}},
             })
@@ -115,13 +116,14 @@ def _levers(base: dict) -> list[dict]:
             "detail": "Плановое ТО и замена фильтров переносятся в межсменное окно; такт в смену не теряется.",
             "set": moved,
         })
-    cut = {area: {"unplannedMin": a["unplannedMin"] * (1 - PREDICTIVE_CUT)} for area, a in base.items() if a["unplannedMin"] > 0}
+    predictive_cut = settings.calc()["predictiveCut"]
+    cut = {area: {"unplannedMin": a["unplannedMin"] * (1 - predictive_cut)} for area, a in base.items() if a["unplannedMin"] > 0}
     if cut:
         levers.append({
             "id": "predictive",
             "area": None,
             "title": "Предиктивное обслуживание",
-            "detail": f"Мониторинг датчиков и цепей предотвращает {round(PREDICTIVE_CUT * 100)}% внеплановых остановок (допущение).",
+            "detail": f"Мониторинг датчиков и цепей предотвращает {round(predictive_cut * 100)}% внеплановых остановок (допущение).",
             "set": cut,
         })
     return levers
@@ -131,8 +133,8 @@ def simulate(lever_ids: list[str] | None = None, shifts: int | None = None, days
              extra_shifts: int = 0, ds: dict | None = None) -> dict:
     ds = window(ds or kpi.current())
     base = area_base(ds)
-    shifts = kpi.TARGETS["shifts"] if shifts is None else shifts
-    days = WORK_DAYS if days is None else days
+    shifts = kpi.targets()["shifts"] if shifts is None else shifts
+    days = settings.calc()["workDays"] if days is None else days
     areas = {a: dict(v) for a, v in base.items()}
     for lever in _levers(base):
         if lever["id"] in (lever_ids or []):
@@ -147,7 +149,7 @@ def simulate(lever_ids: list[str] | None = None, shifts: int | None = None, days
     total_shifts = shifts * days + extra_shifts
     month = per_shift * total_shifts
     plan = sum(m["plan"] for m in ds["monthPlan"])
-    target = kpi.TARGETS["monthly_output"]
+    target = kpi.targets()["monthly_output"]
     gap = max(0.0, target - month)
     return {
         "levers": lever_ids or [],
@@ -171,7 +173,7 @@ def simulate(lever_ids: list[str] | None = None, shifts: int | None = None, days
 
 
 def _risks(base: dict, bottleneck: str, ds: dict) -> list[dict]:
-    limit = kpi.TARGETS["downtime_critical"]
+    limit = kpi.targets()["downtime_critical"]
     risks = []
     for e in kpi.downtime_events(ds):
         if e["area"] not in base:
@@ -210,7 +212,7 @@ def _alerts(base: dict, sim: dict, risks: list[dict], ds: dict) -> list[dict]:
         "text": f"{_n(sim['areas'][bn]['good'])} годных за смену при плане {round(base[bn]['plan'])}. "
                 f"Выпуск завода ограничен этим участком.",
     })
-    target = kpi.TARGETS["defect"]
+    target = kpi.targets()["defect"]
     for area in base:
         rows = sorted((q for q in ds["quality"] if q["area"] == area), key=lambda q: q["date"])
         rates = [q["defects"] / q["output"] * 100 for q in rows]
@@ -271,12 +273,13 @@ def summary(ds: dict | None = None) -> dict:
         "assumptions": [
             f"Темп участков — среднее за последние {kpi.WINDOW_DAYS} дн. данных ({min(r['date'] for r in ds['lines'])} — {max(r['date'] for r in ds['lines'])}).",
             "Строка данных — одна смена; в сутках 2 смены.",
-            f"{WORK_DAYS} рабочий день в октябре 2026 (будни без 26.10).",
+            f"{settings.calc()['workDays']} рабочих дней в месяце прогноза (по умолчанию 21: будни октября 2026 без 26.10).",
             "Брак участка — кузов, не прошедший участок с первого раза; доработанные кузова в прогноз не входят.",
-            f"Предиктивное обслуживание предотвращает {round(PREDICTIVE_CUT * 100)}% внеплановых простоев.",
+            f"Предиктивное обслуживание предотвращает {round(settings.calc()['predictiveCut'] * 100)}% внеплановых простоев.",
             "Эффект мероприятий считается через узкое место: улучшение другого участка выпуск не увеличивает.",
         ],
-        "workDays": WORK_DAYS,
+        "workDays": settings.calc()["workDays"],
+        "marginKzt": settings.calc()["marginKzt"],
         "base": sim,
         "best": best,
         "levers": levers,

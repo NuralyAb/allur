@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Icon } from '../shared/ui/Icon'
 import { Trend } from './Trend'
 import { Gauge, Prio, StateChip, Value, paramAlarm } from '../features/scada/parts'
+import { SignalKind, SignalValue } from './MasterStation'
 import { S, can, clock, fmt, nextStep, type Alarm, type Command, type ControllerDef, type ControllerState, type ScadaConfig, type User } from '../features/scada/scada'
 
 const STATUS_RU: Record<Command['status'], string> = {
@@ -17,6 +18,7 @@ export interface Actions {
   login: () => void
   field: (cid: string, action: 'fault' | 'estop' | 'release' | 'local' | 'remote', code?: number) => void
   explain: (text: string) => void
+  line: (line: string, name: 'START' | 'STOP' | 'HOLD') => void
 }
 
 export function Faceplate({ def, st, config, user, alarms, commands, now, actions, onClose }: {
@@ -193,6 +195,33 @@ export function Faceplate({ def, st, config, user, alarms, commands, now, action
           </ul>
         )}
       </div>
+
+      {(def.cabinet || def.io.length > 0) && (
+        <div className="fp-section fp-cabinet">
+          <h3>Шкаф и сигналы</h3>
+          {def.cabinet && (
+            <dl>
+              <div><dt>Шкаф управления</dt><dd><code>{def.cabinet.id}</code> · {def.cabinet.location}</dd></div>
+              <div><dt>ПЛК</dt><dd>{def.cabinet.plc}</dd></div>
+              <div><dt>Ввод-вывод</dt><dd>{def.cabinet.io}</dd></div>
+              {def.cabinet.drive && <div><dt>Привод</dt><dd>{def.cabinet.drive}</dd></div>}
+            </dl>
+          )}
+          <ul className="fp-io" aria-label="Полевые сигналы">
+            {def.io.map((sig) => {
+              const v = st?.io[sig.id]
+              return (
+                <li key={sig.id}>
+                  <SignalKind kind={sig.kind} />
+                  <span><span><b>{sig.id}</b> {sig.name} <code>{sig.address}</code></span><small>{sig.device}</small></span>
+                  <SignalValue sig={sig} value={v?.value ?? null} quality={v?.q ?? 'bad'} />
+                </li>
+              )
+            })}
+          </ul>
+          <p className="fp-meta">Датчики и приводы подключены к модулям ввода-вывода этого шкафа. ПЛК обрабатывает их в своём цикле и публикует образ клемм серверу SCADA под тегами <code>IO.*</code>; сервер их не меняет — управление идёт только командами PackML.</p>
+        </div>
+      )}
 
       <div className="fp-section fp-tech">
         <h3>Подключение</h3>

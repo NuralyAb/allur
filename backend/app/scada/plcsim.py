@@ -14,7 +14,7 @@ import math
 import random
 
 from .packml import ACTING, ENERGIZING, MODE_CHANGE_STATES, SAFE_COMMANDS, TRANSITIONS, Command, Mode, State, allowed
-from .registry import Controller, Registry
+from .registry import RAW_SPAN, Controller, Registry, Signal
 
 SCAN_S = 0.2
 ACTING_S = 1.5  # длительность переходных состояний (Запуск, Сброс, Остановка…)
@@ -42,6 +42,7 @@ class SimPlc:
         self.target: State | None = None
         self.heartbeat = 0
         self.true = {}  # истинные значения процесса (без шума измерения)
+        self.on_for: dict[str, float] = {}  # сколько секунд параметр «в работе»: защита по нижнему пределу ждёт выхода на режим
         self.sp = {}
         for p in c.params:
             if p.sp:
@@ -135,6 +136,7 @@ class SimPlc:
         self.speed += (goal - self.speed) * k_speed
         for p in self.c.params:
             on = self._active(p)
+            self.on_for[p.id] = self.on_for.get(p.id, 0.0) + dt if on else 0.0
             if p.drift:
                 if on:
                     self.true[p.id] = min(p.range[1], self.true[p.id] + p.drift * dt / 60)
@@ -153,7 +155,9 @@ class SimPlc:
 
     def _tripped(self, p) -> bool:
         v, t = self.true[p.id], p.trip
-        return ("above" in t and v > t["above"]) or ("below" in t and v < t["below"])
+        # нижний предел (расход, давление) проверяется после выхода на режим — как таймер пуска насоса в настоящем ПЛК
+        settled = self.on_for.get(p.id, 0.0) >= 3 * p.tau
+        return ("above" in t and v > t["above"]) or ("below" in t and settled and v < t["below"])
 
     def _publish(self):
         img = self.image
@@ -173,6 +177,35 @@ class SimPlc:
             img[f"Status.Parameter.{p.id}"] = round(v, p.decimals + 1)
             if p.sp:
                 img[f"Status.Setpoint.{p.id}"] = float(self.sp[p.id])
+        for sig in self.c.io:
+            img[f"IO.{sig.id}"] = self._signal(sig)
+
+    def _signal(self, sig: Signal):
+        """Образ процесса на клеммах: то, что модули ввода-вывода видят в поле, и что ПЛК выставляет на выходы."""
+        st, img = self.state, self.image
+        running = st in (State.EXECUTE, State.STARTING, State.UNHOLDING, State.UNSUSPENDING)
+        if sig.kind == "AI":
+            return self._raw(sig, img[f"Status.Parameter.{sig.param}"])
+        if sig.kind == "AO":
+            if sig.src == "speed_ref":
+                return self._raw(sig, self.speed_sp if st == State.EXECUTE else 0.0)
+            p = self.c.param(sig.param)
+            target = self._target(p) if self._active(p) else p.ambient
+            return self._raw(sig, target)
+        on = st not in (State.STOPPED, State.ABORTED, State.ABORTING, State.CLEARING, State.UNDEFINED)
+        return {
+            "estop": self.safety_ok, "guard": self.safety_ok, "remote": self.remote,
+            "run_fb": self.speed > 0.05 * max(self.speed_sp, 1e-6), "fault_fb": st in (State.ABORTED, State.ABORTING),
+            "photoeye": st == State.EXECUTE and self.progress < 0.35, "on": on, "ready": st in (State.IDLE, State.EXECUTE, State.SUSPENDED, State.HELD),
+            "run_cmd": running, "lamp_green": st == State.EXECUTE, "lamp_red": st in (State.ABORTED, State.ABORTING),
+            "lamp_yellow": st in (State.HELD, State.SUSPENDED, State.IDLE, State.STOPPED), "horn": st in (State.STARTING, State.ABORTING),
+            "valve": st == State.EXECUTE,
+        }[sig.src]
+
+    @staticmethod
+    def _raw(sig: Signal, value: float) -> int:
+        lo, hi = sig.range
+        return int(min(RAW_SPAN, max(0, round((value - lo) / (hi - lo) * RAW_SPAN))))
 
     def write(self, suffix: str, value):
         """Запись извне (из SCADA или OPC UA-клиента) — только в область команд, как в настоящем ПЛК."""

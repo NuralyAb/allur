@@ -1,5 +1,15 @@
 /** HTTP-клиент API двойника: JSON-запросы к тому же origin, ошибки сервера — в сообщении исключения. */
 
+/** Токен администратора общий с админкой (/admin.html): импорт, сброс данных и симулятор доступны только ему. */
+function adminAuth(): Record<string, string> {
+  try {
+    const token = localStorage.getItem('allur-admin-token')
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  } catch {
+    return {}
+  }
+}
+
 export async function get<T>(path: string): Promise<T> {
   const res = await fetch(path)
   if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`)
@@ -14,7 +24,7 @@ export async function postJson<T>(path: string, body: unknown, signal?: AbortSig
 
 /** Ответ 4xx с `detail.errors` превращается в ошибку со списком причин для пользователя. */
 export async function post<T>(path: string, body?: BodyInit): Promise<T> {
-  const res = await fetch(path, { method: 'POST', body })
+  const res = await fetch(path, { method: 'POST', body, headers: adminAuth() })
   const json = await res.json().catch(() => null)
   if (!res.ok) {
     const errors: string[] = json?.detail?.errors ?? [typeof json?.detail === 'string' ? json.detail : `${path}: HTTP ${res.status}`]

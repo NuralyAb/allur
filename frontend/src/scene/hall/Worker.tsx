@@ -27,11 +27,17 @@ const ppe = merged([
   new CylinderGeometry(0.169, 0.169, 0.025, 12).translate(0, 0.735, 0),
   ...[0.24, 0.37].flatMap((y) => [-1, 1].map((side) => new BoxGeometry(0.32, 0.036, 0.015).translate(0, y, side * 0.122))),
 ])
-const workwear = paint('#354b5b', 0, 0.84)
-const vest = paint('#c4994d', 0.05, 0.76)
+/** Форма Allur по видео: тёмно-серая куртка с красной кокеткой и белая каска; в окраске — голубые халаты. */
+const OUTFITS = {
+  allur: { legs: MAT.uniform, arms: MAT.uniform, torso: MAT.uniformRed },
+  paint: { legs: paint('#5e7c8a', 0, 0.84), arms: MAT.paintCoat, torso: MAT.paintCoat },
+  visitor: { legs: MAT.uniform, arms: paint('#8f9397', 0, 0.84), torso: MAT.vest },
+} as const
+export type Outfit = keyof typeof OUTFITS
 
 /** Operator PPE at human scale; geometry is shared by all workers. */
-export function Worker({ position, yaw = 0, phase = 0 }: { position: [number, number, number]; yaw?: number; phase?: number }) {
+export function Worker({ position, yaw = 0, phase = 0, outfit = 'allur' }: { position: [number, number, number]; yaw?: number; phase?: number; outfit?: Outfit }) {
+  const o = OUTFITS[outfit]
   const g = useRef<Group>(null!)
   const upper = useRef<Group>(null!)
   useProductionFrame(({ clock }) => {
@@ -41,12 +47,12 @@ export function Worker({ position, yaw = 0, phase = 0 }: { position: [number, nu
   })
   return (
     <group ref={g} position={position} rotation={[0, yaw, 0]}>
-      <mesh geometry={legs} material={workwear} castShadow />
+      <mesh geometry={legs} material={o.legs} castShadow />
       <group ref={upper} position={[0, 0.85, 0]}>
-        <mesh geometry={arms} material={workwear} castShadow />
-        <mesh geometry={torso} material={vest} castShadow />
+        <mesh geometry={arms} material={o.arms} castShadow />
+        <mesh geometry={torso} material={o.torso} castShadow />
         <mesh geometry={skin} material={MAT.skin} />
-        <mesh geometry={ppe} material={MAT.wall} />
+        <mesh geometry={ppe} material={MAT.helmet} />
       </group>
     </group>
   )

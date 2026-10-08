@@ -1,5 +1,5 @@
 {
-  "about": "Реестр контроллеров SCADA. На заводе интегратор указывает адрес OPC UA-сервера ПЛК или шлюза (connections), путь к PackML-интерфейсу каждого ПЛК (path) и при необходимости сопоставление тегов с адресами ПЛК (map: суффикс тега -> NodeId). Блок sim описывает только поведение симулятора.",
+  "about": "Реестр контроллеров SCADA. На заводе интегратор указывает адрес OPC UA-сервера ПЛК или шлюза (connections), путь к PackML-интерфейсу каждого ПЛК (path) и при необходимости сопоставление тегов с адресами ПЛК (map: суффикс тега -> NodeId). Блок sim описывает только поведение симулятора. Блок cabinet — шкаф управления ПЛК, io — перечень полевых сигналов (датчики и исполнительные устройства), которые ПЛК публикует для SCADA под IO.<id>.",
   "writeEnabled": true,
   "commonFaults": {
     "900": "Разомкнута цепь безопасности (аварийная кнопка или ограждение)",
@@ -19,175 +19,2073 @@
     }
   ],
   "lines": [
-    {"id": "main", "name": "Главная линия: сварка → катафорез → печь → окраска → сборка → ОТК",
-     "controllers": ["abb-01", "ed-10", "oven-01", "booth-02", "conveyor-03", "brake-01"],
-     "bufferSeconds": [120, 60, 90, 150, 60]}
+    {
+      "id": "main",
+      "name": "Главная линия: сварка → катафорез → печь → окраска → сборка → ОТК",
+      "controllers": [
+        "abb-01",
+        "ed-10",
+        "oven-01",
+        "booth-02",
+        "conveyor-03",
+        "brake-01"
+      ],
+      "bufferSeconds": [
+        120,
+        60,
+        90,
+        150,
+        60
+      ]
+    }
   ],
   "controllers": [
     {
-      "id": "abb-01", "equipment": "ABB-01", "name": "Робот точечной сварки ABB-01", "zone": "welding", "area": "Сварка",
-      "connection": "line", "path": "Welding.ABB01",
-      "speed": {"value": 18.75, "min": 12, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "id": "abb-01",
+      "equipment": "ABB-01",
+      "name": "Робот точечной сварки ABB-01",
+      "zone": "welding",
+      "area": "Сварка",
+      "connection": "line",
+      "path": "Welding.ABB01",
+      "speed": {
+        "value": 18.75,
+        "min": 12,
+        "max": 20,
+        "maxStep": 2,
+        "unit": "кузов/ч"
+      },
       "params": [
-        {"id": "WeldCurrent", "name": "Ток сварки", "unit": "кА", "decimals": 2, "range": [0, 14], "nominal": 9.5, "ambient": 0, "tau": 1, "noise": 0.12,
-         "alarms": {"lo": 8.5, "hi": 10.5}},
-        {"id": "TipWear", "name": "Износ электродов", "unit": "%", "decimals": 0, "range": [0, 100], "start": 58, "drift": 0.6,
-         "alarms": {"hi": 80, "hihi": 92}, "trip": {"above": 98, "code": 102}, "resetTo": 5},
-        {"id": "CoolantFlow", "name": "Расход охлаждения", "unit": "л/мин", "decimals": 1, "range": [0, 12], "nominal": 8, "ambient": 0, "active": "on", "tau": 2, "noise": 0.15,
-         "alarms": {"lo": 6, "lolo": 4}, "trip": {"below": 3, "code": 103}}
+        {
+          "id": "WeldCurrent",
+          "name": "Ток сварки",
+          "unit": "кА",
+          "decimals": 2,
+          "range": [
+            0,
+            14
+          ],
+          "nominal": 9.5,
+          "ambient": 0,
+          "tau": 1,
+          "noise": 0.12,
+          "alarms": {
+            "lo": 8.5,
+            "hi": 10.5
+          }
+        },
+        {
+          "id": "TipWear",
+          "name": "Износ электродов",
+          "unit": "%",
+          "decimals": 0,
+          "range": [
+            0,
+            100
+          ],
+          "start": 58,
+          "drift": 0.6,
+          "alarms": {
+            "hi": 80,
+            "hihi": 92
+          },
+          "trip": {
+            "above": 98,
+            "code": 102
+          },
+          "resetTo": 5
+        },
+        {
+          "id": "CoolantFlow",
+          "name": "Расход охлаждения",
+          "unit": "л/мин",
+          "decimals": 1,
+          "range": [
+            0,
+            12
+          ],
+          "nominal": 8,
+          "ambient": 0,
+          "active": "on",
+          "tau": 2,
+          "noise": 0.15,
+          "alarms": {
+            "lo": 6,
+            "lolo": 4
+          },
+          "trip": {
+            "below": 3,
+            "code": 103
+          }
+        }
       ],
-      "faults": {"101": "Ошибка датчика", "102": "Износ электродов: требуется замена колпачков", "103": "Нет охлаждения сварочных клещей"},
-      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.022}
+      "faults": {
+        "101": "Ошибка датчика",
+        "102": "Износ электродов: требуется замена колпачков",
+        "103": "Нет охлаждения сварочных клещей"
+      },
+      "cabinet": {
+        "id": "+ШУ-СВ1",
+        "location": "ЦСК, сварочная ячейка 1",
+        "plc": "ABB IRC5 (контроллер робота) + SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": null
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SQ1",
+          "name": "Ограждение ячейки закрыто",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Дверной выключатель с блокировкой, Schmersal AZM",
+          "src": "guard"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "B1",
+          "name": "Кузов на позиции сварки",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Фотодатчик рефлекторный SICK W12",
+          "src": "photoeye"
+        },
+        {
+          "id": "K1",
+          "name": "Робот в автоматическом цикле",
+          "kind": "DI",
+          "address": "%I0.4",
+          "device": "Сигнал AUTO от IRC5",
+          "src": "run_fb"
+        },
+        {
+          "id": "Y1",
+          "name": "Разрешение автоматического цикла",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Дискретный выход → IRC5 (MotorsOn/Start)",
+          "src": "run_cmd"
+        },
+        {
+          "id": "HL1",
+          "name": "Лампа «Работа» (зелёная)",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Световая колонна ячейки",
+          "src": "lamp_green"
+        },
+        {
+          "id": "HL2",
+          "name": "Лампа «Авария» (красная)",
+          "kind": "DO",
+          "address": "%Q0.2",
+          "device": "Световая колонна ячейки",
+          "src": "lamp_red"
+        },
+        {
+          "id": "TI1",
+          "name": "Ток сварки",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Трансформатор тока на сварочном контроллере Bosch",
+          "param": "WeldCurrent"
+        },
+        {
+          "id": "WC1",
+          "name": "Износ электродов",
+          "kind": "AI",
+          "address": "%IW66",
+          "device": "Счётчик точек сварочного контроллера",
+          "param": "TipWear"
+        },
+        {
+          "id": "FT1",
+          "name": "Расход охлаждающей воды",
+          "kind": "AI",
+          "address": "%IW68",
+          "device": "Расходомер турбинный, 4–20 мА",
+          "param": "CoolantFlow"
+        }
+      ],
+      "sim": {
+        "state": 6,
+        "mode": 1,
+        "remote": true,
+        "defectRate": 0.022
+      }
     },
     {
-      "id": "abb-02", "equipment": "ABB-02", "name": "Робот точечной сварки ABB-02", "zone": "welding", "area": "Сварка",
-      "connection": "line", "path": "Welding.ABB02",
-      "speed": {"value": 18.75, "min": 12, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "id": "abb-02",
+      "equipment": "ABB-02",
+      "name": "Робот точечной сварки ABB-02",
+      "zone": "welding",
+      "area": "Сварка",
+      "connection": "line",
+      "path": "Welding.ABB02",
+      "speed": {
+        "value": 18.75,
+        "min": 12,
+        "max": 20,
+        "maxStep": 2,
+        "unit": "кузов/ч"
+      },
       "params": [
-        {"id": "WeldCurrent", "name": "Ток сварки", "unit": "кА", "decimals": 2, "range": [0, 14], "nominal": 9.2, "ambient": 0, "tau": 1, "noise": 0.12,
-         "alarms": {"lo": 8.2, "hi": 10.2}},
-        {"id": "TipWear", "name": "Износ электродов", "unit": "%", "decimals": 0, "range": [0, 100], "start": 31, "drift": 0.5,
-         "alarms": {"hi": 80, "hihi": 92}, "trip": {"above": 98, "code": 102}, "resetTo": 5}
+        {
+          "id": "WeldCurrent",
+          "name": "Ток сварки",
+          "unit": "кА",
+          "decimals": 2,
+          "range": [
+            0,
+            14
+          ],
+          "nominal": 9.2,
+          "ambient": 0,
+          "tau": 1,
+          "noise": 0.12,
+          "alarms": {
+            "lo": 8.2,
+            "hi": 10.2
+          }
+        },
+        {
+          "id": "TipWear",
+          "name": "Износ электродов",
+          "unit": "%",
+          "decimals": 0,
+          "range": [
+            0,
+            100
+          ],
+          "start": 31,
+          "drift": 0.5,
+          "alarms": {
+            "hi": 80,
+            "hihi": 92
+          },
+          "trip": {
+            "above": 98,
+            "code": 102
+          },
+          "resetTo": 5
+        }
       ],
-      "faults": {"101": "Ошибка датчика", "102": "Износ электродов: требуется замена колпачков"},
-      "sim": {"state": 6, "mode": 1, "remote": false, "defectRate": 0.02}
+      "faults": {
+        "101": "Ошибка датчика",
+        "102": "Износ электродов: требуется замена колпачков"
+      },
+      "cabinet": {
+        "id": "+ШУ-СВ2",
+        "location": "ЦСК, сварочная ячейка 2",
+        "plc": "ABB IRC5 (контроллер робота) + SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": null
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SQ1",
+          "name": "Ограждение ячейки закрыто",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Дверной выключатель с блокировкой, Schmersal AZM",
+          "src": "guard"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "B1",
+          "name": "Кузов на позиции сварки",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Фотодатчик рефлекторный SICK W12",
+          "src": "photoeye"
+        },
+        {
+          "id": "K1",
+          "name": "Робот в автоматическом цикле",
+          "kind": "DI",
+          "address": "%I0.4",
+          "device": "Сигнал AUTO от IRC5",
+          "src": "run_fb"
+        },
+        {
+          "id": "Y1",
+          "name": "Разрешение автоматического цикла",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Дискретный выход → IRC5 (MotorsOn/Start)",
+          "src": "run_cmd"
+        },
+        {
+          "id": "HL1",
+          "name": "Лампа «Работа» (зелёная)",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Световая колонна ячейки",
+          "src": "lamp_green"
+        },
+        {
+          "id": "HL2",
+          "name": "Лампа «Авария» (красная)",
+          "kind": "DO",
+          "address": "%Q0.2",
+          "device": "Световая колонна ячейки",
+          "src": "lamp_red"
+        },
+        {
+          "id": "TI1",
+          "name": "Ток сварки",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Трансформатор тока на сварочном контроллере Bosch",
+          "param": "WeldCurrent"
+        },
+        {
+          "id": "WC1",
+          "name": "Износ электродов",
+          "kind": "AI",
+          "address": "%IW66",
+          "device": "Счётчик точек сварочного контроллера",
+          "param": "TipWear"
+        }
+      ],
+      "sim": {
+        "state": 6,
+        "mode": 1,
+        "remote": false,
+        "defectRate": 0.02
+      }
     },
     {
-      "id": "abb-04", "equipment": "ABB-04", "name": "Робот точечной сварки ABB-04", "zone": "welding", "area": "Сварка",
-      "connection": "line", "path": "Welding.ABB04",
-      "speed": {"value": 18.75, "min": 12, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "id": "abb-04",
+      "equipment": "ABB-04",
+      "name": "Робот точечной сварки ABB-04",
+      "zone": "welding",
+      "area": "Сварка",
+      "connection": "line",
+      "path": "Welding.ABB04",
+      "speed": {
+        "value": 18.75,
+        "min": 12,
+        "max": 20,
+        "maxStep": 2,
+        "unit": "кузов/ч"
+      },
       "params": [
-        {"id": "WeldCurrent", "name": "Ток сварки", "unit": "кА", "decimals": 2, "range": [0, 14], "nominal": 9.4, "ambient": 0, "tau": 1, "noise": 0.12,
-         "alarms": {"lo": 8.4, "hi": 10.4}},
-        {"id": "TipWear", "name": "Износ электродов", "unit": "%", "decimals": 0, "range": [0, 100], "start": 4, "drift": 0.5,
-         "alarms": {"hi": 80, "hihi": 92}, "trip": {"above": 98, "code": 102}, "resetTo": 5}
+        {
+          "id": "WeldCurrent",
+          "name": "Ток сварки",
+          "unit": "кА",
+          "decimals": 2,
+          "range": [
+            0,
+            14
+          ],
+          "nominal": 9.4,
+          "ambient": 0,
+          "tau": 1,
+          "noise": 0.12,
+          "alarms": {
+            "lo": 8.4,
+            "hi": 10.4
+          }
+        },
+        {
+          "id": "TipWear",
+          "name": "Износ электродов",
+          "unit": "%",
+          "decimals": 0,
+          "range": [
+            0,
+            100
+          ],
+          "start": 4,
+          "drift": 0.5,
+          "alarms": {
+            "hi": 80,
+            "hihi": 92
+          },
+          "trip": {
+            "above": 98,
+            "code": 102
+          },
+          "resetTo": 5
+        }
       ],
-      "faults": {"101": "Ошибка датчика", "102": "Износ электродов: требуется замена колпачков", "104": "Плановое ТО"},
-      "sim": {"state": 2, "mode": 2, "remote": true, "stopReason": 104, "defectRate": 0.02}
+      "faults": {
+        "101": "Ошибка датчика",
+        "102": "Износ электродов: требуется замена колпачков",
+        "104": "Плановое ТО"
+      },
+      "cabinet": {
+        "id": "+ШУ-СВ4",
+        "location": "ЦСК, сварочная ячейка 4",
+        "plc": "ABB IRC5 (контроллер робота) + SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": null
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SQ1",
+          "name": "Ограждение ячейки закрыто",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Дверной выключатель с блокировкой, Schmersal AZM",
+          "src": "guard"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "B1",
+          "name": "Кузов на позиции сварки",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Фотодатчик рефлекторный SICK W12",
+          "src": "photoeye"
+        },
+        {
+          "id": "K1",
+          "name": "Робот в автоматическом цикле",
+          "kind": "DI",
+          "address": "%I0.4",
+          "device": "Сигнал AUTO от IRC5",
+          "src": "run_fb"
+        },
+        {
+          "id": "Y1",
+          "name": "Разрешение автоматического цикла",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Дискретный выход → IRC5 (MotorsOn/Start)",
+          "src": "run_cmd"
+        },
+        {
+          "id": "HL1",
+          "name": "Лампа «Работа» (зелёная)",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Световая колонна ячейки",
+          "src": "lamp_green"
+        },
+        {
+          "id": "HL2",
+          "name": "Лампа «Авария» (красная)",
+          "kind": "DO",
+          "address": "%Q0.2",
+          "device": "Световая колонна ячейки",
+          "src": "lamp_red"
+        },
+        {
+          "id": "TI1",
+          "name": "Ток сварки",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Трансформатор тока на сварочном контроллере Bosch",
+          "param": "WeldCurrent"
+        },
+        {
+          "id": "WC1",
+          "name": "Износ электродов",
+          "kind": "AI",
+          "address": "%IW66",
+          "device": "Счётчик точек сварочного контроллера",
+          "param": "TipWear"
+        }
+      ],
+      "sim": {
+        "state": 2,
+        "mode": 2,
+        "remote": true,
+        "stopReason": 104,
+        "defectRate": 0.02
+      }
     },
     {
-      "id": "laser-01", "equipment": "Лазер-01", "name": "Ячейка лазерной сварки крыши Onix (8 роботов)", "zone": "welding", "area": "Сварка",
-      "connection": "line", "path": "Welding.Laser01",
-      "speed": {"value": 18, "min": 12, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "id": "laser-01",
+      "equipment": "Лазер-01",
+      "name": "Ячейка лазерной сварки крыши Onix (8 роботов)",
+      "zone": "welding",
+      "area": "Сварка",
+      "connection": "line",
+      "path": "Welding.Laser01",
+      "speed": {
+        "value": 18,
+        "min": 12,
+        "max": 20,
+        "maxStep": 2,
+        "unit": "кузов/ч"
+      },
       "params": [
-        {"id": "LaserPower", "name": "Мощность лазера", "unit": "кВт", "decimals": 2, "range": [0, 6], "sp": {"value": 4.0, "min": 3.0, "max": 5.0, "maxStep": 0.3},
-         "ambient": 0, "tau": 0.5, "noise": 0.03, "alarms": {"dev": 0.25}},
-        {"id": "ShieldGas", "name": "Расход защитного газа", "unit": "л/мин", "decimals": 1, "range": [0, 40], "nominal": 20, "ambient": 0, "tau": 1, "noise": 0.4,
-         "alarms": {"lo": 15, "lolo": 12}},
-        {"id": "OpticsTemp", "name": "Температура оптики", "unit": "°C", "decimals": 1, "range": [0, 80], "nominal": 32, "ambient": 24, "tau": 30, "noise": 0.2,
-         "alarms": {"hi": 45, "hihi": 55}, "trip": {"above": 60, "code": 106}}
+        {
+          "id": "LaserPower",
+          "name": "Мощность лазера",
+          "unit": "кВт",
+          "decimals": 2,
+          "range": [
+            0,
+            6
+          ],
+          "sp": {
+            "value": 4.0,
+            "min": 3.0,
+            "max": 5.0,
+            "maxStep": 0.3
+          },
+          "ambient": 0,
+          "tau": 0.5,
+          "noise": 0.03,
+          "alarms": {
+            "dev": 0.25
+          }
+        },
+        {
+          "id": "ShieldGas",
+          "name": "Расход защитного газа",
+          "unit": "л/мин",
+          "decimals": 1,
+          "range": [
+            0,
+            40
+          ],
+          "nominal": 20,
+          "ambient": 0,
+          "tau": 1,
+          "noise": 0.4,
+          "alarms": {
+            "lo": 15,
+            "lolo": 12
+          }
+        },
+        {
+          "id": "OpticsTemp",
+          "name": "Температура оптики",
+          "unit": "°C",
+          "decimals": 1,
+          "range": [
+            0,
+            80
+          ],
+          "nominal": 32,
+          "ambient": 24,
+          "tau": 30,
+          "noise": 0.2,
+          "alarms": {
+            "hi": 45,
+            "hihi": 55
+          },
+          "trip": {
+            "above": 60,
+            "code": 106
+          }
+        }
       ],
-      "faults": {"105": "Загрязнение защитного стекла", "106": "Перегрев оптики"},
-      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.008}
+      "faults": {
+        "105": "Загрязнение защитного стекла",
+        "106": "Перегрев оптики"
+      },
+      "cabinet": {
+        "id": "+ШУ-ЛЗ1",
+        "location": "ЦСК, кабина лазерной сварки крыши",
+        "plc": "SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": "Источник TruDisk, интерфейс PROFINET"
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SQ1",
+          "name": "Кабина лазера закрыта (класс 1)",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Блокировка дверей кабины, два канала",
+          "src": "guard"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "B1",
+          "name": "Кузов на позиции",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Фотодатчик SICK W12",
+          "src": "photoeye"
+        },
+        {
+          "id": "K1",
+          "name": "Затвор излучения открыт",
+          "kind": "DI",
+          "address": "%I0.4",
+          "device": "Обратная связь затвора источника",
+          "src": "run_fb"
+        },
+        {
+          "id": "Y1",
+          "name": "Разрешение излучения",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Выход → источник (Laser Enable)",
+          "src": "run_cmd"
+        },
+        {
+          "id": "HL2",
+          "name": "Лампа «Лазер включён» (красная)",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Световая колонна кабины",
+          "src": "lamp_red"
+        },
+        {
+          "id": "PI1",
+          "name": "Мощность излучения",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Фотодиодный измеритель источника",
+          "param": "LaserPower"
+        },
+        {
+          "id": "FT1",
+          "name": "Расход защитного газа",
+          "kind": "AI",
+          "address": "%IW66",
+          "device": "Расходомер массовый, 4–20 мА",
+          "param": "ShieldGas"
+        },
+        {
+          "id": "TE1",
+          "name": "Температура оптики",
+          "kind": "AI",
+          "address": "%IW68",
+          "device": "Pt100 в сварочной голове",
+          "param": "OpticsTemp"
+        }
+      ],
+      "sim": {
+        "state": 6,
+        "mode": 1,
+        "remote": true,
+        "defectRate": 0.008
+      }
     },
     {
-      "id": "ed-10", "equipment": "Ванна-10", "name": "Ванна катафорезного грунтования №10", "zone": "paint", "area": "Окраска",
-      "connection": "line", "path": "Paint.ED10",
-      "speed": {"value": 18.75, "min": 14, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "id": "ed-10",
+      "equipment": "Ванна-10",
+      "name": "Ванна катафорезного грунтования №10",
+      "zone": "paint",
+      "area": "Окраска",
+      "connection": "line",
+      "path": "Paint.ED10",
+      "speed": {
+        "value": 18.75,
+        "min": 14,
+        "max": 20,
+        "maxStep": 2,
+        "unit": "кузов/ч"
+      },
       "params": [
-        {"id": "BathTemp", "name": "Температура ванны", "unit": "°C", "decimals": 1, "range": [10, 45], "sp": {"value": 32, "min": 28, "max": 34, "maxStep": 1},
-         "ambient": 22, "active": "on", "tau": 40, "noise": 0.1, "alarms": {"dev": 1.5, "hihi": 36}, "trip": {"above": 38, "code": 203}},
-        {"id": "Voltage", "name": "Напряжение осаждения", "unit": "В", "decimals": 0, "range": [0, 400], "sp": {"value": 260, "min": 200, "max": 300, "maxStep": 10},
-         "ambient": 0, "tau": 2, "noise": 1.5, "alarms": {"dev": 15}},
-        {"id": "Conductivity", "name": "Электропроводность", "unit": "мкСм/см", "decimals": 0, "range": [0, 2500], "start": 1420, "drift": 1.5, "active": "on", "noise": 6,
-         "alarms": {"hi": 1600, "hihi": 1750}}
+        {
+          "id": "BathTemp",
+          "name": "Температура ванны",
+          "unit": "°C",
+          "decimals": 1,
+          "range": [
+            10,
+            45
+          ],
+          "sp": {
+            "value": 32,
+            "min": 28,
+            "max": 34,
+            "maxStep": 1
+          },
+          "ambient": 22,
+          "active": "on",
+          "tau": 40,
+          "noise": 0.1,
+          "alarms": {
+            "dev": 1.5,
+            "hihi": 36
+          },
+          "trip": {
+            "above": 38,
+            "code": 203
+          }
+        },
+        {
+          "id": "Voltage",
+          "name": "Напряжение осаждения",
+          "unit": "В",
+          "decimals": 0,
+          "range": [
+            0,
+            400
+          ],
+          "sp": {
+            "value": 260,
+            "min": 200,
+            "max": 300,
+            "maxStep": 10
+          },
+          "ambient": 0,
+          "tau": 2,
+          "noise": 1.5,
+          "alarms": {
+            "dev": 15
+          }
+        },
+        {
+          "id": "Conductivity",
+          "name": "Электропроводность",
+          "unit": "мкСм/см",
+          "decimals": 0,
+          "range": [
+            0,
+            2500
+          ],
+          "start": 1420,
+          "drift": 1.5,
+          "active": "on",
+          "noise": 6,
+          "alarms": {
+            "hi": 1600,
+            "hihi": 1750
+          }
+        }
       ],
-      "faults": {"203": "Перегрев ванны", "204": "Отказ выпрямителя"},
-      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.01}
+      "faults": {
+        "203": "Перегрев ванны",
+        "204": "Отказ выпрямителя"
+      },
+      "cabinet": {
+        "id": "+ШУ-КТФ",
+        "location": "ЦОК, ванна катафореза №10",
+        "plc": "SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": "Выпрямитель катафореза 400 В / 2000 А, PROFINET"
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "K1",
+          "name": "Насос циркуляции работает",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Обратная связь контактора насоса",
+          "src": "run_fb"
+        },
+        {
+          "id": "LS1",
+          "name": "Уровень ванны в норме",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Поплавковый выключатель уровня",
+          "src": "on"
+        },
+        {
+          "id": "B1",
+          "name": "Кузов в ванне",
+          "kind": "DI",
+          "address": "%I0.4",
+          "device": "Индуктивный датчик положения подвески",
+          "src": "photoeye"
+        },
+        {
+          "id": "Y1",
+          "name": "Выпрямитель включён",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Выход → выпрямитель (Enable)",
+          "src": "run_cmd"
+        },
+        {
+          "id": "Y2",
+          "name": "Клапан подпитки ультрафильтрата",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Электромагнитный клапан 24 В",
+          "src": "valve"
+        },
+        {
+          "id": "TE1",
+          "name": "Температура ванны",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Pt100 в погружной гильзе",
+          "param": "BathTemp"
+        },
+        {
+          "id": "EI1",
+          "name": "Напряжение выпрямителя",
+          "kind": "AI",
+          "address": "%IW66",
+          "device": "Измерительный вход выпрямителя",
+          "param": "Voltage"
+        },
+        {
+          "id": "QT1",
+          "name": "Электропроводность",
+          "kind": "AI",
+          "address": "%IW68",
+          "device": "Кондуктометр индуктивный, 4–20 мА",
+          "param": "Conductivity"
+        },
+        {
+          "id": "UC1",
+          "name": "Задание напряжения выпрямителя",
+          "kind": "AO",
+          "address": "%QW64",
+          "device": "Аналоговый выход 0–10 В → выпрямитель",
+          "param": "Voltage"
+        }
+      ],
+      "sim": {
+        "state": 6,
+        "mode": 1,
+        "remote": true,
+        "defectRate": 0.01
+      }
     },
     {
-      "id": "oven-01", "equipment": "Печь-01", "name": "Печь сушки катафорезного грунта", "zone": "paint", "area": "Окраска",
-      "connection": "line", "path": "Paint.Oven01",
-      "speed": {"value": 18.75, "min": 14, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "id": "oven-01",
+      "equipment": "Печь-01",
+      "name": "Печь сушки катафорезного грунта",
+      "zone": "paint",
+      "area": "Окраска",
+      "connection": "line",
+      "path": "Paint.Oven01",
+      "speed": {
+        "value": 18.75,
+        "min": 14,
+        "max": 20,
+        "maxStep": 2,
+        "unit": "кузов/ч"
+      },
       "params": [
-        {"id": "Temp", "name": "Температура зоны выдержки", "unit": "°C", "decimals": 0, "range": [0, 250], "sp": {"value": 180, "min": 160, "max": 200, "maxStep": 10},
-         "ambient": 25, "active": "on", "tau": 45, "noise": 0.6, "alarms": {"dev": 8, "hihi": 205}, "trip": {"above": 215, "code": 205},
-         "permissive": {"command": "START", "belowSp": 10, "text": "Печь не прогрета"}},
-        {"id": "Burner", "name": "Нагрузка горелок", "unit": "%", "decimals": 0, "range": [0, 100], "nominal": 46, "ambient": 0, "active": "on", "tau": 5, "noise": 1.2,
-         "alarms": {"hi": 90}}
+        {
+          "id": "Temp",
+          "name": "Температура зоны выдержки",
+          "unit": "°C",
+          "decimals": 0,
+          "range": [
+            0,
+            250
+          ],
+          "sp": {
+            "value": 180,
+            "min": 160,
+            "max": 200,
+            "maxStep": 10
+          },
+          "ambient": 25,
+          "active": "on",
+          "tau": 45,
+          "noise": 0.6,
+          "alarms": {
+            "dev": 8,
+            "hihi": 205
+          },
+          "trip": {
+            "above": 215,
+            "code": 205
+          },
+          "permissive": {
+            "command": "START",
+            "belowSp": 10,
+            "text": "Печь не прогрета"
+          }
+        },
+        {
+          "id": "Burner",
+          "name": "Нагрузка горелок",
+          "unit": "%",
+          "decimals": 0,
+          "range": [
+            0,
+            100
+          ],
+          "nominal": 46,
+          "ambient": 0,
+          "active": "on",
+          "tau": 5,
+          "noise": 1.2,
+          "alarms": {
+            "hi": 90
+          }
+        }
       ],
-      "faults": {"205": "Перегрев печи", "206": "Погасание пламени горелки"},
-      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.004}
+      "faults": {
+        "205": "Перегрев печи",
+        "206": "Погасание пламени горелки"
+      },
+      "cabinet": {
+        "id": "+ШУ-ПЧ1",
+        "location": "ЦОК, печь сушки катафорезного грунта",
+        "plc": "SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": "SINAMICS G120 — вентилятор циркуляции и конвейер печи"
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "K1",
+          "name": "Вентилятор циркуляции работает",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Обратная связь ПЧ (Run)",
+          "src": "run_fb"
+        },
+        {
+          "id": "BF1",
+          "name": "Пламя горелки есть",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Контроллер горения, ионизационный датчик",
+          "src": "on"
+        },
+        {
+          "id": "PS1",
+          "name": "Давление газа в норме",
+          "kind": "DI",
+          "address": "%I0.4",
+          "device": "Реле давления газа (мин/макс)",
+          "src": "on"
+        },
+        {
+          "id": "Y1",
+          "name": "Разрешение горелки",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Выход → контроллер горения",
+          "src": "run_cmd"
+        },
+        {
+          "id": "HL1",
+          "name": "Лампа «Работа» (зелёная)",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Световая колонна печи",
+          "src": "lamp_green"
+        },
+        {
+          "id": "TE1",
+          "name": "Температура зоны выдержки",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Термопара тип K + преобразователь 4–20 мА",
+          "param": "Temp"
+        },
+        {
+          "id": "ZT1",
+          "name": "Положение привода горелки",
+          "kind": "AI",
+          "address": "%IW66",
+          "device": "Потенциометр сервопривода горелки",
+          "param": "Burner"
+        },
+        {
+          "id": "ZC1",
+          "name": "Задание положения горелки",
+          "kind": "AO",
+          "address": "%QW64",
+          "device": "Аналоговый выход 0–10 В → сервопривод",
+          "param": "Burner"
+        },
+        {
+          "id": "SC1",
+          "name": "Задание скорости конвейера печи",
+          "kind": "AO",
+          "address": "%QW66",
+          "device": "Аналоговый выход 0–10 В → ПЧ",
+          "src": "speed_ref"
+        }
+      ],
+      "sim": {
+        "state": 6,
+        "mode": 1,
+        "remote": true,
+        "defectRate": 0.004
+      }
     },
     {
-      "id": "booth-01", "equipment": "Камера-01", "name": "Камера нанесения грунта", "zone": "paint", "area": "Окраска",
-      "connection": "line", "path": "Paint.Booth01",
-      "speed": {"value": 18.75, "min": 14, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "id": "booth-01",
+      "equipment": "Камера-01",
+      "name": "Камера нанесения грунта",
+      "zone": "paint",
+      "area": "Окраска",
+      "connection": "line",
+      "path": "Paint.Booth01",
+      "speed": {
+        "value": 18.75,
+        "min": 14,
+        "max": 20,
+        "maxStep": 2,
+        "unit": "кузов/ч"
+      },
       "params": [
-        {"id": "Temp", "name": "Температура воздуха", "unit": "°C", "decimals": 1, "range": [10, 35], "sp": {"value": 23, "min": 19, "max": 27, "maxStep": 2},
-         "ambient": 18, "active": "on", "tau": 30, "noise": 0.12, "alarms": {"dev": 1.5}},
-        {"id": "Humidity", "name": "Влажность воздуха", "unit": "%", "decimals": 0, "range": [30, 90], "sp": {"value": 65, "min": 55, "max": 75, "maxStep": 5},
-         "ambient": 45, "active": "on", "tau": 40, "noise": 0.4, "alarms": {"dev": 5}},
-        {"id": "FilterDp", "name": "Перепад давления на фильтре", "unit": "Па", "decimals": 0, "range": [0, 400], "start": 118, "drift": 1.2, "noise": 1.5,
-         "alarms": {"hi": 220, "hihi": 260}, "trip": {"above": 285, "code": 201}, "resetTo": 110}
+        {
+          "id": "Temp",
+          "name": "Температура воздуха",
+          "unit": "°C",
+          "decimals": 1,
+          "range": [
+            10,
+            35
+          ],
+          "sp": {
+            "value": 23,
+            "min": 19,
+            "max": 27,
+            "maxStep": 2
+          },
+          "ambient": 18,
+          "active": "on",
+          "tau": 30,
+          "noise": 0.12,
+          "alarms": {
+            "dev": 1.5
+          }
+        },
+        {
+          "id": "Humidity",
+          "name": "Влажность воздуха",
+          "unit": "%",
+          "decimals": 0,
+          "range": [
+            30,
+            90
+          ],
+          "sp": {
+            "value": 65,
+            "min": 55,
+            "max": 75,
+            "maxStep": 5
+          },
+          "ambient": 45,
+          "active": "on",
+          "tau": 40,
+          "noise": 0.4,
+          "alarms": {
+            "dev": 5
+          }
+        },
+        {
+          "id": "FilterDp",
+          "name": "Перепад давления на фильтре",
+          "unit": "Па",
+          "decimals": 0,
+          "range": [
+            0,
+            400
+          ],
+          "start": 118,
+          "drift": 1.2,
+          "noise": 1.5,
+          "alarms": {
+            "hi": 220,
+            "hihi": 260
+          },
+          "trip": {
+            "above": 285,
+            "code": 201
+          },
+          "resetTo": 110
+        }
       ],
-      "faults": {"201": "Замена фильтра", "202": "Засор форсунки"},
-      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.02}
+      "faults": {
+        "201": "Замена фильтра",
+        "202": "Засор форсунки"
+      },
+      "cabinet": {
+        "id": "+ШУ-ОК1",
+        "location": "ЦОК, окрасочная камера 1",
+        "plc": "SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": "SINAMICS G120 — приточный и вытяжной вентиляторы"
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "K1",
+          "name": "Приточный вентилятор работает",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Обратная связь ПЧ (Run)",
+          "src": "run_fb"
+        },
+        {
+          "id": "B1",
+          "name": "Кузов в камере",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Фотодатчик SICK W12 на входе",
+          "src": "photoeye"
+        },
+        {
+          "id": "SQ1",
+          "name": "Двери камеры закрыты",
+          "kind": "DI",
+          "address": "%I0.4",
+          "device": "Дверные выключатели, два канала",
+          "src": "guard"
+        },
+        {
+          "id": "Y1",
+          "name": "Пуск вентиляторов",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Выход → ПЧ (Run)",
+          "src": "run_cmd"
+        },
+        {
+          "id": "Y2",
+          "name": "Подача краски к роботам",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Пневмораспределитель 24 В",
+          "src": "valve"
+        },
+        {
+          "id": "TE1",
+          "name": "Температура воздуха",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Датчик температуры/влажности E+E, 4–20 мА",
+          "param": "Temp"
+        },
+        {
+          "id": "MT1",
+          "name": "Относительная влажность",
+          "kind": "AI",
+          "address": "%IW66",
+          "device": "Датчик температуры/влажности E+E, 4–20 мА",
+          "param": "Humidity"
+        },
+        {
+          "id": "PDT1",
+          "name": "Перепад давления на фильтрах",
+          "kind": "AI",
+          "address": "%IW68",
+          "device": "Дифманометр Dwyer, 4–20 мА",
+          "param": "FilterDp"
+        },
+        {
+          "id": "SC1",
+          "name": "Задание скорости конвейера",
+          "kind": "AO",
+          "address": "%QW64",
+          "device": "Аналоговый выход 0–10 В → ПЧ",
+          "src": "speed_ref"
+        }
+      ],
+      "sim": {
+        "state": 6,
+        "mode": 1,
+        "remote": true,
+        "defectRate": 0.02
+      }
     },
     {
-      "id": "booth-02", "equipment": "Камера-02", "name": "Камера окраски базой и лаком", "zone": "paint", "area": "Окраска",
-      "connection": "line", "path": "Paint.Booth02",
-      "speed": {"value": 18.75, "min": 14, "max": 20, "maxStep": 2, "unit": "кузов/ч"},
+      "id": "booth-02",
+      "equipment": "Камера-02",
+      "name": "Камера окраски базой и лаком",
+      "zone": "paint",
+      "area": "Окраска",
+      "connection": "line",
+      "path": "Paint.Booth02",
+      "speed": {
+        "value": 18.75,
+        "min": 14,
+        "max": 20,
+        "maxStep": 2,
+        "unit": "кузов/ч"
+      },
       "params": [
-        {"id": "Temp", "name": "Температура воздуха", "unit": "°C", "decimals": 1, "range": [10, 35], "sp": {"value": 23, "min": 19, "max": 27, "maxStep": 2},
-         "ambient": 18, "active": "on", "tau": 30, "noise": 0.12, "alarms": {"dev": 1.5}},
-        {"id": "Humidity", "name": "Влажность воздуха", "unit": "%", "decimals": 0, "range": [30, 90], "sp": {"value": 65, "min": 55, "max": 75, "maxStep": 5},
-         "ambient": 45, "active": "on", "tau": 40, "noise": 0.4, "alarms": {"dev": 5}},
-        {"id": "FilterDp", "name": "Перепад давления на фильтре", "unit": "Па", "decimals": 0, "range": [0, 400], "start": 196, "drift": 2.5, "noise": 1.5,
-         "alarms": {"hi": 220, "hihi": 260}, "trip": {"above": 285, "code": 201}, "resetTo": 110}
+        {
+          "id": "Temp",
+          "name": "Температура воздуха",
+          "unit": "°C",
+          "decimals": 1,
+          "range": [
+            10,
+            35
+          ],
+          "sp": {
+            "value": 23,
+            "min": 19,
+            "max": 27,
+            "maxStep": 2
+          },
+          "ambient": 18,
+          "active": "on",
+          "tau": 30,
+          "noise": 0.12,
+          "alarms": {
+            "dev": 1.5
+          }
+        },
+        {
+          "id": "Humidity",
+          "name": "Влажность воздуха",
+          "unit": "%",
+          "decimals": 0,
+          "range": [
+            30,
+            90
+          ],
+          "sp": {
+            "value": 65,
+            "min": 55,
+            "max": 75,
+            "maxStep": 5
+          },
+          "ambient": 45,
+          "active": "on",
+          "tau": 40,
+          "noise": 0.4,
+          "alarms": {
+            "dev": 5
+          }
+        },
+        {
+          "id": "FilterDp",
+          "name": "Перепад давления на фильтре",
+          "unit": "Па",
+          "decimals": 0,
+          "range": [
+            0,
+            400
+          ],
+          "start": 196,
+          "drift": 2.5,
+          "noise": 1.5,
+          "alarms": {
+            "hi": 220,
+            "hihi": 260
+          },
+          "trip": {
+            "above": 285,
+            "code": 201
+          },
+          "resetTo": 110
+        }
       ],
-      "faults": {"201": "Замена фильтра", "202": "Засор форсунки"},
-      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.043}
+      "faults": {
+        "201": "Замена фильтра",
+        "202": "Засор форсунки"
+      },
+      "cabinet": {
+        "id": "+ШУ-ОК2",
+        "location": "ЦОК, окрасочная камера 2",
+        "plc": "SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": "SINAMICS G120 — приточный и вытяжной вентиляторы"
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "K1",
+          "name": "Приточный вентилятор работает",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Обратная связь ПЧ (Run)",
+          "src": "run_fb"
+        },
+        {
+          "id": "B1",
+          "name": "Кузов в камере",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Фотодатчик SICK W12 на входе",
+          "src": "photoeye"
+        },
+        {
+          "id": "SQ1",
+          "name": "Двери камеры закрыты",
+          "kind": "DI",
+          "address": "%I0.4",
+          "device": "Дверные выключатели, два канала",
+          "src": "guard"
+        },
+        {
+          "id": "Y1",
+          "name": "Пуск вентиляторов",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Выход → ПЧ (Run)",
+          "src": "run_cmd"
+        },
+        {
+          "id": "Y2",
+          "name": "Подача краски к роботам",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Пневмораспределитель 24 В",
+          "src": "valve"
+        },
+        {
+          "id": "TE1",
+          "name": "Температура воздуха",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Датчик температуры/влажности E+E, 4–20 мА",
+          "param": "Temp"
+        },
+        {
+          "id": "MT1",
+          "name": "Относительная влажность",
+          "kind": "AI",
+          "address": "%IW66",
+          "device": "Датчик температуры/влажности E+E, 4–20 мА",
+          "param": "Humidity"
+        },
+        {
+          "id": "PDT1",
+          "name": "Перепад давления на фильтрах",
+          "kind": "AI",
+          "address": "%IW68",
+          "device": "Дифманометр Dwyer, 4–20 мА",
+          "param": "FilterDp"
+        },
+        {
+          "id": "SC1",
+          "name": "Задание скорости конвейера",
+          "kind": "AO",
+          "address": "%QW64",
+          "device": "Аналоговый выход 0–10 В → ПЧ",
+          "src": "speed_ref"
+        }
+      ],
+      "sim": {
+        "state": 6,
+        "mode": 1,
+        "remote": true,
+        "defectRate": 0.043
+      }
     },
     {
-      "id": "conveyor-03", "equipment": "Конвейер-03", "name": "Главный сборочный конвейер (59 постов)", "zone": "assembly", "area": "Сборка",
-      "connection": "line", "path": "Assembly.Conveyor03",
-      "speed": {"value": 16.7, "min": 12, "max": 18, "maxStep": 1.5, "unit": "авто/ч"},
+      "id": "conveyor-03",
+      "equipment": "Конвейер-03",
+      "name": "Главный сборочный конвейер (59 постов)",
+      "zone": "assembly",
+      "area": "Сборка",
+      "connection": "line",
+      "path": "Assembly.Conveyor03",
+      "speed": {
+        "value": 16.7,
+        "min": 12,
+        "max": 18,
+        "maxStep": 1.5,
+        "unit": "авто/ч"
+      },
       "params": [
-        {"id": "ChainTension", "name": "Натяжение цепи", "unit": "кН", "decimals": 1, "range": [0, 25], "start": 13.4, "drift": 0.08, "noise": 0.15,
-         "alarms": {"hi": 16, "hihi": 18}, "trip": {"above": 19.5, "code": 301}, "resetTo": 12},
-        {"id": "MotorCurrent", "name": "Ток привода", "unit": "А", "decimals": 1, "range": [0, 80], "nominal": 42, "ambient": 0, "tau": 2, "noise": 0.8,
-         "alarms": {"hi": 58, "hihi": 65}, "trip": {"above": 70, "code": 302}}
+        {
+          "id": "ChainTension",
+          "name": "Натяжение цепи",
+          "unit": "кН",
+          "decimals": 1,
+          "range": [
+            0,
+            25
+          ],
+          "start": 13.4,
+          "drift": 0.08,
+          "noise": 0.15,
+          "alarms": {
+            "hi": 16,
+            "hihi": 18
+          },
+          "trip": {
+            "above": 19.5,
+            "code": 301
+          },
+          "resetTo": 12
+        },
+        {
+          "id": "MotorCurrent",
+          "name": "Ток привода",
+          "unit": "А",
+          "decimals": 1,
+          "range": [
+            0,
+            80
+          ],
+          "nominal": 42,
+          "ambient": 0,
+          "tau": 2,
+          "noise": 0.8,
+          "alarms": {
+            "hi": 58,
+            "hihi": 65
+          },
+          "trip": {
+            "above": 70,
+            "code": 302
+          }
+        }
       ],
-      "faults": {"301": "Обрыв цепи", "302": "Перегрузка привода"},
-      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.012}
+      "faults": {
+        "301": "Обрыв цепи",
+        "302": "Перегрузка привода"
+      },
+      "cabinet": {
+        "id": "+ШУ-СБ3",
+        "location": "Сборочный цех, пост 1 конвейера",
+        "plc": "SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": "SINAMICS G120 — привод цепи 22 кВт"
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SQ1",
+          "name": "Тросовые выключатели по линии",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Цепь тросовых аварийных выключателей, 59 постов",
+          "src": "guard"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "K1",
+          "name": "Контактор привода включён",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Вспомогательный контакт контактора",
+          "src": "run_fb"
+        },
+        {
+          "id": "K2",
+          "name": "Авария преобразователя частоты",
+          "kind": "DI",
+          "address": "%I0.4",
+          "device": "Релейный выход ПЧ (Fault)",
+          "src": "fault_fb"
+        },
+        {
+          "id": "B1",
+          "name": "Подвеска на посту 1",
+          "kind": "DI",
+          "address": "%I0.5",
+          "device": "Индуктивный датчик IFM, счёт тактов",
+          "src": "photoeye"
+        },
+        {
+          "id": "Y1",
+          "name": "Пуск преобразователя частоты",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Выход → ПЧ (Run)",
+          "src": "run_cmd"
+        },
+        {
+          "id": "HA1",
+          "name": "Сирена предпусковая",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Сирена 24 В, 5 с перед пуском",
+          "src": "horn"
+        },
+        {
+          "id": "HL1",
+          "name": "Лампа «Работа» (зелёная)",
+          "kind": "DO",
+          "address": "%Q0.2",
+          "device": "Световые колонны по линии",
+          "src": "lamp_green"
+        },
+        {
+          "id": "HL2",
+          "name": "Лампа «Авария» (красная)",
+          "kind": "DO",
+          "address": "%Q0.3",
+          "device": "Световые колонны по линии",
+          "src": "lamp_red"
+        },
+        {
+          "id": "WT1",
+          "name": "Натяжение цепи",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Тензодатчик натяжной станции, 4–20 мА",
+          "param": "ChainTension"
+        },
+        {
+          "id": "EI1",
+          "name": "Ток привода",
+          "kind": "AI",
+          "address": "%IW66",
+          "device": "Измерение ПЧ по PROFINET",
+          "param": "MotorCurrent"
+        },
+        {
+          "id": "SC1",
+          "name": "Задание скорости привода",
+          "kind": "AO",
+          "address": "%QW64",
+          "device": "Аналоговый выход 0–10 В → ПЧ",
+          "src": "speed_ref"
+        }
+      ],
+      "sim": {
+        "state": 6,
+        "mode": 1,
+        "remote": true,
+        "defectRate": 0.012
+      }
     },
     {
-      "id": "nutrunner-07", "equipment": "Гайковёрт-07", "name": "Гайковёрт колёс, 5 шпинделей", "zone": "assembly", "area": "Сборка",
-      "connection": "line", "path": "Assembly.Nutrunner07",
-      "speed": {"value": 16.7, "unit": "авто/ч"},
+      "id": "nutrunner-07",
+      "equipment": "Гайковёрт-07",
+      "name": "Гайковёрт колёс, 5 шпинделей",
+      "zone": "assembly",
+      "area": "Сборка",
+      "connection": "line",
+      "path": "Assembly.Nutrunner07",
+      "speed": {
+        "value": 16.7,
+        "unit": "авто/ч"
+      },
       "params": [
-        {"id": "Torque", "name": "Момент затяжки", "unit": "Н·м", "decimals": 0, "range": [0, 200], "sp": {"value": 110, "min": 100, "max": 130, "maxStep": 5},
-         "ambient": 0, "tau": 0.3, "noise": 1.5, "alarms": {"dev": 6}}
+        {
+          "id": "Torque",
+          "name": "Момент затяжки",
+          "unit": "Н·м",
+          "decimals": 0,
+          "range": [
+            0,
+            200
+          ],
+          "sp": {
+            "value": 110,
+            "min": 100,
+            "max": 130,
+            "maxStep": 5
+          },
+          "ambient": 0,
+          "tau": 0.3,
+          "noise": 1.5,
+          "alarms": {
+            "dev": 6
+          }
+        }
       ],
-      "faults": {"401": "Отказ инструмента", "402": "Затяжка вне допуска (NOK)"},
-      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.005}
+      "faults": {
+        "401": "Отказ инструмента",
+        "402": "Затяжка вне допуска (NOK)"
+      },
+      "cabinet": {
+        "id": "+ШУ-ГВ7",
+        "location": "Сборочный цех, пост 7 (колёса)",
+        "plc": "Atlas Copco PowerFocus 6000 + SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": null
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "B1",
+          "name": "Автомобиль на посту",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Фотодатчик SICK W12",
+          "src": "photoeye"
+        },
+        {
+          "id": "K1",
+          "name": "Цикл затяжки идёт",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Сигнал Cycle от контроллера гайковёрта",
+          "src": "run_fb"
+        },
+        {
+          "id": "Y1",
+          "name": "Разрешение затяжки",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Выход → PowerFocus (Enable)",
+          "src": "run_cmd"
+        },
+        {
+          "id": "HL1",
+          "name": "Лампа «OK» (зелёная)",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Световая колонна поста",
+          "src": "lamp_green"
+        },
+        {
+          "id": "HL2",
+          "name": "Лампа «NOK» (красная)",
+          "kind": "DO",
+          "address": "%Q0.2",
+          "device": "Световая колонна поста",
+          "src": "lamp_red"
+        },
+        {
+          "id": "MT1",
+          "name": "Момент затяжки",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Датчик момента шпинделя, по PROFINET",
+          "param": "Torque"
+        }
+      ],
+      "sim": {
+        "state": 6,
+        "mode": 1,
+        "remote": true,
+        "defectRate": 0.005
+      }
     },
     {
-      "id": "brake-01", "equipment": "Стенд-01", "name": "Тормозной стенд ОТК", "zone": "qc", "area": "ОТК",
-      "connection": "line", "path": "QC.Brake01",
-      "speed": {"value": 17, "unit": "авто/ч"},
+      "id": "brake-01",
+      "equipment": "Стенд-01",
+      "name": "Тормозной стенд ОТК",
+      "zone": "qc",
+      "area": "ОТК",
+      "connection": "line",
+      "path": "QC.Brake01",
+      "speed": {
+        "value": 17,
+        "unit": "авто/ч"
+      },
       "params": [
-        {"id": "RollerSpeed", "name": "Скорость роликов", "unit": "км/ч", "decimals": 2, "range": [0, 10], "nominal": 5, "ambient": 0, "tau": 1, "noise": 0.04,
-         "alarms": {"lo": 4.5}},
-        {"id": "MotorTemp", "name": "Температура двигателей", "unit": "°C", "decimals": 1, "range": [0, 120], "nominal": 58, "ambient": 22, "tau": 120, "noise": 0.3,
-         "alarms": {"hi": 80, "hihi": 95}, "trip": {"above": 100, "code": 502}}
+        {
+          "id": "RollerSpeed",
+          "name": "Скорость роликов",
+          "unit": "км/ч",
+          "decimals": 2,
+          "range": [
+            0,
+            10
+          ],
+          "nominal": 5,
+          "ambient": 0,
+          "tau": 1,
+          "noise": 0.04,
+          "alarms": {
+            "lo": 4.5
+          }
+        },
+        {
+          "id": "MotorTemp",
+          "name": "Температура двигателей",
+          "unit": "°C",
+          "decimals": 1,
+          "range": [
+            0,
+            120
+          ],
+          "nominal": 58,
+          "ambient": 22,
+          "tau": 120,
+          "noise": 0.3,
+          "alarms": {
+            "hi": 80,
+            "hihi": 95
+          },
+          "trip": {
+            "above": 100,
+            "code": 502
+          }
+        }
       ],
-      "faults": {"501": "Отказ датчика тормозной силы", "502": "Перегрев двигателей роликов"},
-      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.017}
+      "faults": {
+        "501": "Отказ датчика тормозной силы",
+        "502": "Перегрев двигателей роликов"
+      },
+      "cabinet": {
+        "id": "+ШУ-ОТК1",
+        "location": "ОТК, тормозной стенд",
+        "plc": "SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": "SINAMICS G120 — привод роликов"
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "B1",
+          "name": "Автомобиль на стенде",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Датчики положения колёс (два канала)",
+          "src": "photoeye"
+        },
+        {
+          "id": "K1",
+          "name": "Ролики вращаются",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Обратная связь ПЧ (Run)",
+          "src": "run_fb"
+        },
+        {
+          "id": "K2",
+          "name": "Авария преобразователя частоты",
+          "kind": "DI",
+          "address": "%I0.4",
+          "device": "Релейный выход ПЧ (Fault)",
+          "src": "fault_fb"
+        },
+        {
+          "id": "Y1",
+          "name": "Пуск привода роликов",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Выход → ПЧ (Run)",
+          "src": "run_cmd"
+        },
+        {
+          "id": "HL2",
+          "name": "Лампа «Авария» (красная)",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Световая колонна стенда",
+          "src": "lamp_red"
+        },
+        {
+          "id": "ST1",
+          "name": "Скорость роликов",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Энкодер роликов, импульсный вход",
+          "param": "RollerSpeed"
+        },
+        {
+          "id": "TE1",
+          "name": "Температура двигателя",
+          "kind": "AI",
+          "address": "%IW66",
+          "device": "Pt100 в обмотке",
+          "param": "MotorTemp"
+        },
+        {
+          "id": "SC1",
+          "name": "Задание скорости роликов",
+          "kind": "AO",
+          "address": "%QW64",
+          "device": "Аналоговый выход 0–10 В → ПЧ",
+          "src": "speed_ref"
+        }
+      ],
+      "sim": {
+        "state": 6,
+        "mode": 1,
+        "remote": true,
+        "defectRate": 0.017
+      }
     },
     {
-      "id": "rain-01", "equipment": "Дождь-01", "name": "Дождевальная камера (проверка герметичности)", "zone": "qc", "area": "ОТК",
-      "connection": "line", "path": "QC.Rain01",
-      "speed": {"value": 17, "unit": "авто/ч"},
+      "id": "rain-01",
+      "equipment": "Дождь-01",
+      "name": "Дождевальная камера (проверка герметичности)",
+      "zone": "qc",
+      "area": "ОТК",
+      "connection": "line",
+      "path": "QC.Rain01",
+      "speed": {
+        "value": 17,
+        "unit": "авто/ч"
+      },
       "params": [
-        {"id": "WaterPressure", "name": "Давление воды", "unit": "бар", "decimals": 2, "range": [0, 4], "sp": {"value": 2.0, "min": 1.5, "max": 3.0, "maxStep": 0.3},
-         "ambient": 0, "tau": 3, "noise": 0.02, "alarms": {"dev": 0.25}},
-        {"id": "TankLevel", "name": "Уровень в баке", "unit": "%", "decimals": 0, "range": [0, 100], "nominal": 78, "ambient": 78, "active": "on", "tau": 60, "noise": 0.3,
-         "alarms": {"lo": 40, "lolo": 25}}
+        {
+          "id": "WaterPressure",
+          "name": "Давление воды",
+          "unit": "бар",
+          "decimals": 2,
+          "range": [
+            0,
+            4
+          ],
+          "sp": {
+            "value": 2.0,
+            "min": 1.5,
+            "max": 3.0,
+            "maxStep": 0.3
+          },
+          "ambient": 0,
+          "tau": 3,
+          "noise": 0.02,
+          "alarms": {
+            "dev": 0.25
+          }
+        },
+        {
+          "id": "TankLevel",
+          "name": "Уровень в баке",
+          "unit": "%",
+          "decimals": 0,
+          "range": [
+            0,
+            100
+          ],
+          "nominal": 78,
+          "ambient": 78,
+          "active": "on",
+          "tau": 60,
+          "noise": 0.3,
+          "alarms": {
+            "lo": 40,
+            "lolo": 25
+          }
+        }
       ],
-      "faults": {"601": "Отказ насоса"},
-      "sim": {"state": 6, "mode": 1, "remote": true, "defectRate": 0.0}
+      "faults": {
+        "601": "Отказ насоса"
+      },
+      "cabinet": {
+        "id": "+ШУ-ДК1",
+        "location": "ОТК, дождевальная камера",
+        "plc": "SIMATIC S7-1500 CPU 1516F-3 PN/DP",
+        "io": "ET 200SP: DI 16×24 В, DO 16×24 В, AI 4×4–20 мА, AO 2×0–10 В",
+        "drive": null
+      },
+      "io": [
+        {
+          "id": "ES1",
+          "name": "Аварийная кнопка (НЗ-контакт)",
+          "kind": "DI",
+          "address": "%I0.0",
+          "device": "Кнопка грибовидная на пульте, реле безопасности PNOZ",
+          "src": "estop"
+        },
+        {
+          "id": "SA1",
+          "name": "Ключ «Местный/Дистанционный»",
+          "kind": "DI",
+          "address": "%I0.1",
+          "device": "Переключатель с ключом на двери шкафа",
+          "src": "remote"
+        },
+        {
+          "id": "K1",
+          "name": "Насос высокого давления работает",
+          "kind": "DI",
+          "address": "%I0.2",
+          "device": "Обратная связь контактора насоса",
+          "src": "run_fb"
+        },
+        {
+          "id": "LS1",
+          "name": "Уровень в баке выше минимума",
+          "kind": "DI",
+          "address": "%I0.3",
+          "device": "Поплавковый выключатель",
+          "src": "on"
+        },
+        {
+          "id": "B1",
+          "name": "Автомобиль в камере",
+          "kind": "DI",
+          "address": "%I0.4",
+          "device": "Фотодатчик на въезде",
+          "src": "photoeye"
+        },
+        {
+          "id": "Y1",
+          "name": "Пуск насоса",
+          "kind": "DO",
+          "address": "%Q0.0",
+          "device": "Контактор насоса",
+          "src": "run_cmd"
+        },
+        {
+          "id": "Y2",
+          "name": "Клапан форсунок",
+          "kind": "DO",
+          "address": "%Q0.1",
+          "device": "Электромагнитный клапан 24 В",
+          "src": "valve"
+        },
+        {
+          "id": "PT1",
+          "name": "Давление воды",
+          "kind": "AI",
+          "address": "%IW64",
+          "device": "Датчик давления 0–4 бар, 4–20 мА",
+          "param": "WaterPressure"
+        },
+        {
+          "id": "LT1",
+          "name": "Уровень в баке",
+          "kind": "AI",
+          "address": "%IW66",
+          "device": "Гидростатический уровнемер, 4–20 мА",
+          "param": "TankLevel"
+        }
+      ],
+      "sim": {
+        "state": 6,
+        "mode": 1,
+        "remote": true,
+        "defectRate": 0.0
+      }
     }
-  ]
+  ],
+  "station": {
+    "name": "Центральный пульт управления (ЦПУ)",
+    "location": "Диспетчерская, 2-й этаж АБК",
+    "server": "Сервер SCADA, серверная АБК",
+    "network": "Сеть цеха PROFINET / Industrial Ethernet, кольцо MRP через коммутаторы цехов",
+    "redundancy": "Один узел; резервный сервер и переключение при отказе — не настроены"
+  }
 }

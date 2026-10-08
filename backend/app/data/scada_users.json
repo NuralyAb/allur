@@ -1,5 +1,5 @@
 {
-  "about": "Демо-учётные записи SCADA (логин = пароль). На заводе замените файл (SCADA_USERS) или подключите AD/LDAP. Хеш: PBKDF2-SHA256, 200 000 итераций.",
+  "about": "Демо-учётные записи SCADA и админки двойника (логин = пароль). На заводе замените файл (SCADA_USERS) или подключите AD/LDAP. Хеш: PBKDF2-SHA256, 200 000 итераций.",
   "users": [
     {
       "login": "operator",
@@ -21,6 +21,13 @@
       "role": "viewer",
       "salt": "ec7e9dde116cdcec6ea5748997bf2999",
       "hash": "7c8b75724be6c46c8eb489a0587dccc8e8b5a8c1462f17e132a558a81e61c134"
+    },
+    {
+      "login": "admin",
+      "name": "Администратор двойника",
+      "role": "admin",
+      "salt": "386310455f81729ba791ca360c75550d",
+      "hash": "7b21cf79db9d1d9de97e8ce552fc36ce6a37917a2aa7334e9f4b9c38bc2c7006"
     }
   ]
 }

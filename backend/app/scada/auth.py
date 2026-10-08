@@ -1,7 +1,7 @@
 """Пользователи и роли SCADA. Смотреть могут все в сети завода, управлять — только после входа.
 
 Роли: наблюдатель — только чтение; оператор — пуск, стоп, сброс, квитирование тревог;
-инженер — также уставки, скорость, режимы и отложение тревог.
+инженер — также уставки, скорость, режимы и отложение тревог; администратор — всё это плюс админка двойника.
 Учётные записи — data/scada_users.json (путь — SCADA_USERS), пароли хранятся как PBKDF2-SHA256.
 На заводе этот модуль заменяется входом через AD/LDAP или OIDC (Keycloak) с теми же ролями.
 """
@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 USERS_FILE = Path(os.environ.get("SCADA_USERS", Path(__file__).resolve().parents[1] / "data" / "scada_users.json"))
-ROLES = ("viewer", "operator", "engineer")
-ROLE_RU = {"viewer": "Наблюдатель", "operator": "Оператор", "engineer": "Инженер АСУ ТП"}
+ROLES = ("viewer", "operator", "engineer", "admin")
+ROLE_RU = {"viewer": "Наблюдатель", "operator": "Оператор", "engineer": "Инженер АСУ ТП", "admin": "Администратор"}
 SESSION_SECONDS = 12 * 3600  # смена плюс запас
 MAX_FAILS, LOCK_SECONDS = 5, 300
 ITERATIONS = 200_000
@@ -53,9 +53,19 @@ def hash_password(password: str, salt: str | None = None) -> dict:
 
 class Auth:
     def __init__(self, path: Path = USERS_FILE):
-        self.users = {u["login"]: u for u in json.loads(Path(path).read_text(encoding="utf-8"))["users"]}
+        self.path = Path(path)
+        self.users: dict[str, dict] = {}
         self.sessions: dict[str, tuple[User, float]] = {}
         self.fails: dict[str, tuple[int, float]] = {}
+        self.reload()
+
+    def reload(self):
+        """Перечитать файл пользователей; сессии сохраняются."""
+        self.users = {u["login"]: u for u in json.loads(self.path.read_text(encoding="utf-8"))["users"]}
+
+    def revoke(self, login: str):
+        """Завершить все сессии пользователя — после блокировки или смены пароля."""
+        self.sessions = {t: s for t, s in self.sessions.items() if s[0].login != login}
 
     def login(self, login: str, password: str) -> tuple[str, User]:
         now = time.time()
@@ -69,6 +79,8 @@ class Auth:
         if not ok:
             self.fails[login] = (fails + 1, since)
             raise Forbidden("Неверный логин или пароль")
+        if u.get("blocked"):
+            raise Forbidden("Учётная запись заблокирована")
         self.fails.pop(login, None)
         user = User(u["login"], u["name"], u["role"])
         token = secrets.token_urlsafe(32)

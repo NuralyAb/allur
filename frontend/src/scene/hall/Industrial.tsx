@@ -6,9 +6,9 @@ import { Instanced } from './Hall'
 export type IndustrialItem = { p: [number, number, number]; s: [number, number, number]; r?: number }
 const frame = paint('#53616a', 0.64, 0.43)
 const brightSteel = paint('#9aa5aa', 0.78, 0.34)
-const amber = paint('#c8a45d', 0.3, 0.55)
+const amber = paint('#e8b92a', 0.25, 0.55) // жёлтые борта конвейеров и подсветка шкафов, как на видео
 const cabinet = paint('#c3ccce', 0.23, 0.55)
-const tray = paint('#647d89', 0.22, 0.65)
+const tray = paint('#8b9296', 0.1, 0.7) // серые пластиковые тары
 const screen = new MeshStandardMaterial({ color: '#1e343d', emissive: '#426f77', emissiveIntensity: 0.28, roughness: 0.3 })
 const rollerGeo = new CylinderGeometry(0.5, 0.5, 1, 12).rotateX(Math.PI / 2)
 

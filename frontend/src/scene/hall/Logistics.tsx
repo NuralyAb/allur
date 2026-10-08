@@ -196,10 +196,35 @@ function SmallParts() {
     ...[-1.8, 1.8].flatMap((x) => [-0.8, 0.8].map((z) => ({ p: [b.u + x, 0.45, -b.v + z] as [number, number, number], s: [0.12, 0.9, 0.12] as [number, number, number] }))),
   ])
   const jigs: Item[] = benches.map((b) => ({ p: [b.u, 1.25, -b.v], s: [3.2, 0.5, 1.4] }))
+  // Красные пневмоприжимы кондукторов и синие шкафы — как в цехе мелкоузловой сборки на видео
+  const clamps: Item[] = benches.flatMap((b) => [-1.1, 0, 1.1].map((x) => ({ p: [b.u + x, 1.7, -b.v + 0.55] as [number, number, number], s: [0.18, 0.4, 0.18] as [number, number, number] })))
+  const cabinets: Item[] = benches.filter((_, i) => i % 2 === 0).map((b) => ({ p: [b.u + 2.8, 0.6, -b.v], s: [0.7, 1.2, 1.0] }))
+  // Белые перегородки с лентой окон: ЦМУС отделён от основного цеха «чистыми» помещениями
+  const partitions = useMemo(() => {
+    const segs: { p: [number, number, number]; len: number; along: 'u' | 'v' }[] = [
+      { p: [29, 0, -138.5], len: 54, along: 'u' },
+      { p: [29, 0, -190], len: 54, along: 'u' },
+      { p: [56, 0, -164], len: 52, along: 'v' },
+      { p: [29, 0, -164], len: 54, along: 'u' },
+    ]
+    const lower: Item[] = [], glass: Item[] = [], upper: Item[] = []
+    for (const sg of segs) {
+      const size = (h: number): [number, number, number] => sg.along === 'u' ? [sg.len, h, 0.16] : [0.16, h, sg.len]
+      lower.push({ p: [sg.p[0], 0.9, sg.p[2]], s: size(1.8) })
+      glass.push({ p: [sg.p[0], 2.4, sg.p[2]], s: size(1.2) })
+      upper.push({ p: [sg.p[0], 3.4, sg.p[2]], s: size(0.8) })
+    }
+    return { lower, glass, upper }
+  }, [])
   return (
     <group>
+      <Instanced geometry={unitBox} material={MAT.wall} items={partitions.lower} />
+      <Instanced geometry={unitBox} material={boothGlass} items={partitions.glass} />
+      <Instanced geometry={unitBox} material={MAT.wall} items={partitions.upper} />
       <Instanced geometry={unitBox} material={MAT.darkSteel} items={tables} />
       <Instanced geometry={unitBox} material={MAT.steel} items={jigs} />
+      <Instanced geometry={unitBox} material={paint('#c62828', 0.2, 0.5)} items={clamps} />
+      <Instanced geometry={unitBox} material={MAT.bluePlastic} items={cabinets} />
       <PartsRacks width={3} positions={benches.map((b) => [b.u, 0, -(b.v + 2.6)])} />
       {benches.map((b, i) => (
         <Worker key={i} position={[b.u + (i % 2 ? 1 : -1), 0, -(b.v - 1.8)]} yaw={Math.PI / 2} phase={i * 0.9} />

@@ -95,7 +95,7 @@ export function SourcePanel({ source, onClose, onChanged }: { source: DataSource
 
         <div aria-live="polite">
           {message && <p className="source-message ok"><Icon name="check" size={14} />{message}</p>}
-          {errors.length > 0 && <div className="source-message bad"><Icon name="alert" size={14} /><div><strong>Файл не загружен</strong><ul>{errors.map((e) => <li key={e}>{e}</li>)}</ul></div></div>}
+          {errors.length > 0 && <div className="source-message bad"><Icon name="alert" size={14} /><div><strong>{errors.some((e) => e.includes('администратор')) ? 'Нужны права администратора' : 'Файл не загружен'}</strong><ul>{errors.map((e) => <li key={e}>{e}</li>)}</ul>{errors.some((e) => e.includes('администратор')) && <a href="/admin.html" target="_blank" rel="noreferrer">Войти в админку ↗</a>}</div></div>}
         </div>
 
         <section>

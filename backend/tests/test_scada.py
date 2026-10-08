@@ -75,6 +75,23 @@ class RegistryTests(unittest.TestCase):
         self.assertIn("conveyor-03", reg.controllers)
         self.assertEqual(reg.controllers["conveyor-03"].equipment, "Конвейер-03")
 
+    def test_io_signals_bound_to_params(self):
+        reg = registry.load()
+        c = reg.controllers["oven-01"]
+        self.assertEqual(c.cabinet.id, "+ШУ-ПЧ1")
+        te = c.signal("TE1")
+        self.assertEqual((te.kind, te.unit, te.range), ("AI", "°C", (0, 250)))
+        self.assertAlmostEqual(te.scale(27648), 250)
+        self.assertEqual(c.signal("SC1").range[1], 20)  # задание скорости — по максимуму конвейера
+        self.assertIn("IO.ES1", c.read_tags())
+        raw = copy.deepcopy(RAW)
+        raw["controllers"][0]["io"][0]["src"] = "magic"
+        raw["controllers"][0]["io"].append({"id": "X1", "name": "x", "kind": "AI", "address": "%IW99", "device": "", "param": "Nope"})
+        with self.assertRaises(ValueError) as e:
+            registry.parse(raw)
+        self.assertIn("неизвестный источник", str(e.exception))
+        self.assertIn("нет параметра", str(e.exception))
+
     def test_invalid_config_is_rejected_at_start(self):
         raw = copy.deepcopy(RAW)
         raw["controllers"][0]["params"][0]["alarms"] = {"dev": 1}  # отклонение без уставки
@@ -100,6 +117,27 @@ class SimulatorTests(unittest.TestCase):
         p.advance(120)
         for cid in ("abb-01", "ed-10", "oven-01", "booth-02", "conveyor-03", "brake-01"):
             self.assertEqual(p.state(cid), State.EXECUTE, cid)
+
+    def test_plc_publishes_field_signals(self):
+        p = Plant()
+        plc = p.sim.plcs["conveyor-03"]
+        self.assertTrue(plc.image["IO.ES1"])  # аварийная кнопка не нажата: НЗ-контакт замкнут
+        self.assertTrue(plc.image["IO.K1"])  # контактор привода включён
+        self.assertTrue(plc.image["IO.Y1"])  # выход «пуск ПЧ»
+        temp = p.sim.plcs["oven-01"]
+        self.assertAlmostEqual(temp.c.signal("TE1").scale(temp.image["IO.TE1"]), temp.image["Status.Parameter.Temp"], delta=0.05)
+        p.sim.set_safety("conveyor-03", False)
+        p.advance(3)
+        self.assertFalse(plc.image["IO.ES1"])
+        self.assertTrue(plc.image["IO.HL2"])  # красная лампа
+        self.assertFalse(plc.image["IO.Y1"])
+        snap = p.scada.snapshot()
+        self.assertEqual(snap["controllers"]["conveyor-03"]["io"]["ES1"]["value"], False)
+        self.assertEqual(snap["server"]["signals"], sum(len(c.io) for c in p.reg.controllers.values()))
+        self.assertEqual(snap["server"]["online"], 12)
+        rows = p.scada.io_rows()
+        self.assertEqual(len(rows), snap["server"]["signals"])
+        self.assertEqual(next(r for r in rows if r["tag"] == "Assembly.Conveyor03.IO.WT1")["unit"], "кН")
 
     def test_plc_rejects_command_in_local_mode(self):
         p = Plant()  # abb-02: ключ «Местный»
@@ -225,6 +263,38 @@ class CommandTests(unittest.IsolatedAsyncioTestCase):
         cmd = await p.run(ENGINEER, "booth-02", "setpoint", "Temp", 24.5)
         self.assertEqual(cmd.status, "done")
         self.assertEqual(p.sim.read("booth-02", "Status.Setpoint.Temp"), 24.5)
+
+    async def line_tick(self, p: Plant, seconds: float):
+        for _ in range(int(seconds / 0.5)):
+            p.advance(0.5)
+            await p.scada.line_tick()
+
+    async def test_line_stop_and_start_from_master_station(self):
+        p = Plant()
+        cmd = await p.scada.request_line(OPERATOR, "main", "STOP")
+        self.assertEqual(cmd.status, "sent")  # остановка — без подтверждения
+        await self.line_tick(p, 20)
+        self.assertEqual(cmd.status, "done")
+        for cid in p.reg.lines[0]["controllers"]:
+            self.assertEqual(p.state(cid), State.STOPPED, cid)
+        self.assertEqual([s["controller"] for s in cmd.steps], p.reg.lines[0]["controllers"])  # с начала линии
+        p.sim.set_remote("ed-10", False)  # ванна переведена на местное управление — её пропустят
+        cmd = await p.scada.request_line(OPERATOR, "main", "START")
+        self.assertEqual(cmd.status, "armed")
+        await p.scada.confirm(OPERATOR, cmd.id)
+        await self.line_tick(p, 60)
+        self.assertEqual(cmd.status, "done", cmd.message)
+        self.assertEqual(cmd.steps[0]["controller"], "brake-01")  # пуск — с конца линии
+        self.assertIn("Ванна-10", cmd.message)
+        self.assertIn("Печь не прогрета", cmd.message)  # остывшую печь сбросили, но пуск заблокирован разрешением
+        self.assertEqual(p.state("ed-10"), State.STOPPED)
+        self.assertEqual(p.state("oven-01"), State.IDLE)
+        for cid in ("abb-01", "booth-02", "conveyor-03", "brake-01"):
+            self.assertIn(p.state(cid), (State.EXECUTE, State.SUSPENDED), cid)
+        with self.assertRaises(CommandError):
+            await p.scada.request_line(VIEWER, "main", "STOP")
+        with self.assertRaises(CommandError):
+            await p.scada.request_line(OPERATOR, "nowhere", "STOP")
 
     async def test_read_only_mode(self):
         p = Plant()
@@ -368,7 +438,14 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(alarms[0]["title"], "Конвейер-03: обрыв цепи")
             self.assertEqual(alarms[0]["area"], "Сборка")
             with client.websocket_connect("/api/scada/stream") as ws:
-                self.assertIn("conveyor-03", ws.receive_json()["controllers"])
+                snap = ws.receive_json()
+                self.assertIn("conveyor-03", snap["controllers"])
+                self.assertEqual(snap["server"]["clients"], 1)
+            self.assertEqual(client.get("/api/scada/server").json()["clients"], 0)
+            self.assertEqual(client.get("/api/scada/io").json()[0]["kind"], "DI")
+            r = client.post("/api/scada/lines/main/commands", json={"name": "STOP"}, headers=headers)
+            self.assertEqual(r.json()["kind"], "line")
+            self.assertEqual(client.post("/api/scada/lines/main/commands", json={"name": "FLY"}, headers=headers).status_code, 422)
             self.assertTrue(client.get("/api/scada/audit/verify").json()["ok"])
 
 

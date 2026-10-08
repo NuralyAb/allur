@@ -5,11 +5,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    // две страницы: цифровой двойник и лёгкий пульт HMI для панелей у линии
+    // три страницы: цифровой двойник, лёгкий пульт HMI для панелей у линии и админка
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         hmi: fileURLToPath(new URL('./hmi.html', import.meta.url)),
+        admin: fileURLToPath(new URL('./admin.html', import.meta.url)),
       },
     },
   },

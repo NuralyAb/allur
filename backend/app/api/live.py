@@ -1,20 +1,23 @@
 import asyncio
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from ..services import data_source
+from ..repositories import store
+from ..scada.auth import User
+from ..services import accounts, data_source
 
 router = APIRouter(prefix="/api", tags=["live"])
 
 
 @router.post("/live/{action}")
-async def post_live(action: str) -> dict:
-    """Запустить или остановить симулятор линии."""
+async def post_live(action: str, user: User = Depends(accounts.admin_user)) -> dict:
+    """Запустить или остановить симулятор линии. Только администратор."""
     if action not in ("start", "stop"):
         raise HTTPException(404)
     data_source.set_live(action == "start")
+    store.default().audit(user.login, user.role, f"live.{action}")
     return data_source.summary()
 
 
