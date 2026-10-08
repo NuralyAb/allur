@@ -244,9 +244,9 @@ h1 { font-size: 29px; line-height: 1.25; letter-spacing: -1.1px; margin: 0; font
   .metric-bottom { margin-top: 7px; }
 }
 .scene-stage { box-shadow: 0 4px 24px #1f303607; }
-.scene-focused .dashboard > .page-heading,
-.scene-focused .dashboard > .kpis,
-.scene-focused .dashboard > .live-strip { display: none; }
+.scene-focused .factory-view > .page-heading,
+.scene-focused .factory-view > .kpis,
+.scene-focused .factory-view > .live-strip { display: none; }
 .scene-focused .scene-stage { flex: 1; min-height: 0; }
 .scene-focused .dashboard { overflow: hidden; }
 .tag { background: #f8fafaf0; color: #34454d; border-width: 0 0 0 3px; border-radius: 3px; box-shadow: 0 3px 12px #17233215; font-weight: 600; }
