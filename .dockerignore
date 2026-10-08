@@ -1,0 +1,19 @@
+# Контекст сборки — корень репозитория: бэкенду нужен docs/case, фронтенду — frontend/.
+# Всё, что собирается или ставится внутри образа, в контекст не попадает.
+.git
+.gitignore
+.venv
+**/__pycache__
+**/*.pyc
+frontend/node_modules
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+**/.check-tmp.mjs
+backend/data
+backend/.env
+docs/screenshots
+docs/CHANGELOG.md
+docs/SCADA.md
+README.md
+docs/case/*.pdf

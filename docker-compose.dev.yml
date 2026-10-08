@@ -1,0 +1,46 @@
+# Разработка в контейнерах: uvicorn --reload и dev-сервер Vite, код монтируется с хоста.
+# Запуск: docker compose -f docker-compose.dev.yml up --build
+# Открыть http://localhost:5173 (двойник), /hmi.html (пульт), /admin.html (админка).
+# Если порты заняты локальным запуском, переопределите: DEV_PORT, API_PORT, OPCUA_PORT.
+name: allur-dev
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      SCADA_MODE: ${SCADA_MODE:-opcua-sim}
+      PLCSIM_ENDPOINT: ${PLCSIM_ENDPOINT:-opc.tcp://0.0.0.0:4840/allur/plcsim}
+      SCADA_WRITE: ${SCADA_WRITE:-0}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_MODE: ${AI_MODE:-on}
+    volumes:
+      # правки в backend/app подхватываются перезагрузкой uvicorn
+      - ./backend/app:/app/backend/app:ro
+      - ./docs/case:/app/docs/case:ro
+      - allur-dev-state:/var/lib/allur
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+      - "127.0.0.1:${OPCUA_PORT:-4840}:4840"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/backend/app"]
+
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    environment:
+      # /api из dev-сервера Vite уходит на контейнер API (vite.config.ts читает эту переменную)
+      ALLUR_API_TARGET: http://api:8000
+    volumes:
+      - ./frontend:/app
+      # node_modules — в томе: сборка под Linux не должна затирать установленные на хосте под macOS
+      - allur-dev-modules:/app/node_modules
+    ports:
+      - "${DEV_PORT:-5173}:5173"
+    depends_on:
+      - api
+    command: ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0"]
+
+volumes:
+  allur-dev-state:
+  allur-dev-modules:

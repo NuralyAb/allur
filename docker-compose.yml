@@ -1,0 +1,49 @@
+# Деплой: API цифрового двойника + статика под nginx. Запуск: docker compose up -d --build
+# Браузер идёт только на web (по умолчанию порт 8080): он же отдаёт страницы и проксирует /api.
+name: allur
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      # opcua-sim — симулятор ПЛК публикуется как OPC UA-сервер (промышленный путь, IEC 62541);
+      # sim — симулятор в памяти без сети; plant — подключение к контроллерам завода; off — без SCADA
+      SCADA_MODE: ${SCADA_MODE:-opcua-sim}
+      PLCSIM_ENDPOINT: ${PLCSIM_ENDPOINT:-opc.tcp://0.0.0.0:4840/allur/plcsim}
+      # Запись уставок и команд в контроллеры. На демо и в пилоте держим выключенной.
+      SCADA_WRITE: ${SCADA_WRITE:-0}
+      SCADA_HISTORY_DAYS: ${SCADA_HISTORY_DAYS:-7}
+      # Ассистент и отчёты ИИ. Без ключа прогнозы и аномалии работают, LLM-ответы — нет.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4.1}
+      AI_MODE: ${AI_MODE:-on}
+      AI_LLM: ${AI_LLM:-on}
+    volumes:
+      # twin.db, scada.db и учётные записи: без тома правки паспорта, импорт и пользователи
+      # исчезнут при пересборке образа
+      - allur-state:/var/lib/allur
+    ports:
+      # OPC UA симулятора — для UaExpert и внешних клиентов; наружу не публикуем
+      - "127.0.0.1:${OPCUA_PORT:-4840}:4840"
+      # Схема OpenAPI на /docs; через nginx API доступен и так, порт нужен для отладки
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    restart: unless-stopped
+    stop_grace_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      # nginx стартует после того, как API ответил на /api/health: иначе первые запросы
+      # страницы уйдут в 502
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  allur-state:
