@@ -267,8 +267,11 @@ function Pbs() {
     for (let u = 304; u <= 352; u += 6)
       for (const v of [18, 28, 38, 48, 58, 68, 78]) {
         // кузова на двух ярусах стеллажа
-        out.push({ p: [u, 0.5, -v], r: Math.PI / 2, color: CAR_COLORS[k % 5], model: pickModel(k++) })
-        if ((u + v) % 4 === 0) out.push({ p: [u, 3.3, -v], r: Math.PI / 2, color: CAR_COLORS[k % 5], model: pickModel(k++) })
+        for (const h of (u + v) % 4 === 0 ? [0.5, 3.3] : [0.5]) {
+          const color = CAR_COLORS[k % 5], model = pickModel(k)
+          out.push({ p: [u, h, -v], r: Math.PI / 2, color, model, unit: { key: `pbs:${k}`, place: 'pbs', model, color, index: k } })
+          k++
+        }
       }
     return out
   }, [])

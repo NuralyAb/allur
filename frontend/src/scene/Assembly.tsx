@@ -1,11 +1,11 @@
 import { useProductionFrame, useProductionEnabled, StageScope } from '../simulation/ProductionClock'
 import { Text } from '@react-three/drei'
-import { Suspense, useMemo, useRef, type RefObject } from 'react'
+import { Suspense, useMemo, useRef } from 'react'
 import { Color, InstancedMesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, type Group, type Mesh } from 'three'
 import { CAR_COLORS, MAT, paint, unitBox, unitCyl } from './assets'
 import { Car, type CarHandle } from './Car'
 import { pickModel } from './carModels'
-import { FinishedCar } from './FinishedCar'
+import { track } from './carUnits'
 import { useGlbAssets } from './glbAssets'
 import { OptionalGlb } from './OptionalGlb'
 import { Instanced } from './Hall'
@@ -61,6 +61,7 @@ const tunnelLight = new MeshBasicMaterial({ color: new Color(1.25, 1.3, 1.34), t
 const waterGlass = new MeshStandardMaterial({ color: '#7fb6e6', transparent: true, opacity: 0.25, roughness: 0.05, depthWrite: false })
 const dropMat = new MeshBasicMaterial({ color: '#d7ecff', transparent: true, opacity: 0.7, depthWrite: false })
 const lift = paint('#f2a900', 0.3, 0.5)
+const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x))
 
 /** Конвейер сборки: кузов «обрастает» стёклами и колёсами по ходу. */
 function AssemblyCars() {
@@ -69,15 +70,25 @@ function AssemblyCars() {
   const count = Math.floor(length / POST)
   const cars = useRef<(CarHandle | null)[]>([])
   const hangers = useRef<(Group | null)[]>([])
+  const units = useMemo(() => Array.from({ length: count }, (_, i) => ({
+    key: `assembly:${i}`, place: 'assembly' as const, model: pickModel(i), color: CAR_COLORS[(i * 3) % 5], index: i,
+  })), [count])
 
   useProductionFrame(({ clock }) => {
     const t = clock.elapsedTime
     cars.current.forEach((c, i) => {
       if (!c) return
-      const dist = mod(t * SPEED + i * POST, count * POST)
+      const travel = t * SPEED + i * POST
+      const dist = mod(travel, count * POST)
       const p = placeOnPath(path, length, dist, c.root)
       const laneB = p.y > 1.2
       const laneC = Math.abs(p.z + LANES[2]) < 0.5
+      const laneA = Math.abs(p.z + LANES[0]) < 0.5
+      // пост по нумерации LineFurniture: A — 1–20, B — 21–40 (обратный ход), C — 41–59; 0 — переход между ветками
+      const post = laneA ? 1 + clamp(Math.floor((p.x - UA) / POST), 0, 19)
+        : laneB && Math.abs(p.z + LANES[1]) < 0.5 ? 21 + clamp(Math.floor((UB - p.x) / POST), 0, 19)
+        : laneC ? 41 + clamp(Math.floor((p.x - UA) / POST), 0, 18) : 0
+      track(c.root, dist / (count * POST), post, Math.floor(travel / (count * POST)))
       c.setGlass(laneB && p.x < UB - 18 ? MAT.glass : laneC ? MAT.glass : MAT.opening)
       c.setWheels(laneC && p.x > UA + 4 * POST)
       c.setDetails(laneB || laneC)
@@ -90,7 +101,7 @@ function AssemblyCars() {
     <group>
       {Array.from({ length: count }, (_, i) => (
         <group key={i}>
-          <Car ref={(c) => void (cars.current[i] = c)} model={pickModel(i)} body={paint(CAR_COLORS[(i * 3) % 5])} />
+          <Car ref={(c) => void (cars.current[i] = c)} model={pickModel(i)} body={paint(CAR_COLORS[(i * 3) % 5])} unit={units[i]} />
         </group>
       ))}
       {/* подвески подвесного конвейера едут вместе с кузовами ветки B */}
@@ -132,28 +143,35 @@ function HangerFollowers({
 }
 
 /** ОТК: готовые машины проходят испытательные посты. */
-function QcCars({ onixRef }: { detailed: boolean; onixRef?: RefObject<Group | null> }) {
+function QcCars() {
   const path = useMemo(() => makePath(QC_PATH, 4), [])
   const length = useMemo(() => path.getLength(), [path])
   const spacing = 13
   const count = Math.floor(length / spacing)
-  const cars = useRef<(Group | null)[]>([])
-  useProductionFrame(({ clock }) => {
+  const cars = useRef<(CarHandle | null)[]>([])
+  const units = useMemo(() => Array.from({ length: count }, (_, i) => ({
+    key: `qc:${i}`, place: 'qc' as const, model: pickModel(i + 3), color: CAR_COLORS[(i * 2) % 5], index: i,
+  })), [count])
+  useProductionFrame(({ clock }, delta) => {
     const t = clock.elapsedTime
     cars.current.forEach((c, i) => {
       if (!c) return
-      placeOnPath(path, length, mod(t * 1.1 + i * spacing, count * spacing), c)
+      const travel = t * 1.1 + i * spacing
+      const dist = mod(travel, count * spacing)
+      const p = placeOnPath(path, length, dist, c.root)
+      c.wheels.children.forEach((wheel) => { wheel.rotation.z -= delta * 1.1 / 0.31 })
+      // испытательный пост для карточки машины — см. QC_STATIONS в ui/carPassport.ts
+      const station = Math.abs(p.z + 72) < 1.5 ? (p.x < 209 ? 0 : p.x < 219 ? 1 : p.x < 229 ? 2 : p.x <= 240 ? 3 : 0)
+        : Math.abs(p.z + 48) < 1.5 && p.x > 194 && p.x < 220 ? 4
+        : Math.abs(p.z + 24) < 1.5 && p.x > 191 && p.x < 221 ? 5
+        : p.z > -12 ? 6 : 0
+      track(c.root, dist / (count * spacing), station, Math.floor(travel / (count * spacing)))
     })
   })
   return (
     <group>
       {Array.from({ length: count }, (_, i) => (
-        <FinishedCar
-          key={i}
-          ref={(c) => { cars.current[i] = c; if (i === 1 && onixRef) onixRef.current = c }}
-          model={pickModel(i + 3)}
-          body={paint(CAR_COLORS[i === 1 ? 0 : (i * 2) % 5])}
-        />
+        <Car key={i} ref={(c) => void (cars.current[i] = c)} model={units[i].model} body={paint(units[i].color)} glass={MAT.glass} wheels details unit={units[i]} />
       ))}
     </group>
   )
@@ -401,14 +419,14 @@ function Marriage() {
   )
 }
 
-export function Assembly({ detailed = true, onixRef }: { detailed?: boolean; onixRef?: RefObject<Group | null> }) {
+export function Assembly({ detailed = true }: { detailed?: boolean }) {
   const simulated = useProductionEnabled()
   return (
     <group>
       <LineFurniture detailed={detailed} />
       {!simulated && <AssemblyCars />}
       <StageScope stage="qc"><QcStations /></StageScope>
-      {!simulated && <QcCars detailed={detailed} onixRef={onixRef} />}
+      {!simulated && <QcCars />}
     </group>
   )
 }

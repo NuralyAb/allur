@@ -1,0 +1,71 @@
+/* Карточка автомобиля. Каркас, заголовок и прокрутка — от .zonepanel. */
+.carpanel h2 { margin-right: 72px; }
+.car-heading-actions { position: absolute; top: 13px; right: 12px; display: flex; gap: 6px; }
+.car-heading-actions .icon-button.selected { border-color: #f3dcd6; background: #fdf2ef; color: var(--accent); }
+.car-ident { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 7px; }
+.car-color { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; color: var(--muted); }
+.car-color i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #00000024; box-shadow: inset 0 1px 2px #ffffff8c; }
+.car-vin { display: inline-flex; align-items: center; gap: 7px; min-width: 0; padding: 2px 2px 2px 8px; border: 1px solid #e9ecf0; border-radius: 6px; background: #f6f7f9; }
+.car-vin > span { font-size: 8px; font-weight: 700; letter-spacing: 1px; color: var(--muted); }
+.car-vin code { min-width: 0; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; letter-spacing: .5px; color: #8a93a1; white-space: nowrap; }
+.car-vin code b { font-weight: 600; color: var(--text); }
+.car-copy { width: 24px; height: 24px; display: grid; place-items: center; flex-shrink: 0; padding: 0; border: 1px solid transparent; border-radius: 5px; background: transparent; color: #7d8794; }
+.car-copy:hover { background: #fff; border-color: #dfe3e9; color: var(--text); }
+.car-copy.copied { color: var(--ok); }
+
+.car-status { display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; border: 1px solid #dcece4; border-radius: 8px; background: #f2f8f5; }
+.car-status > div { flex: 1; min-width: 0; }
+.car-status strong { display: block; font-size: 12px; line-height: 1.45; }
+.car-zone { align-self: center; width: 28px; height: 28px; display: grid; place-items: center; flex-shrink: 0; padding: 0; border: 1px solid #0000000f; border-radius: 6px; background: #ffffffa8; color: #66717f; }
+.car-zone:hover { background: #fff; color: var(--text); }
+.car-status div > span { display: block; margin-top: 1px; font-size: 10px; line-height: 1.6; color: #66717f; }
+.car-status-dot { flex-shrink: 0; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px #2782612a; }
+.car-status-warn { background: #fdf8ef; border-color: #f0e2c6; }
+.car-status-warn .car-status-dot { background: #c48a1c; box-shadow: 0 0 0 3px #c48a1c2e; }
+.car-status-bad { background: #fef6f4; border-color: #f3dbd5; }
+.car-status-bad .car-status-dot { background: var(--bad); box-shadow: 0 0 0 3px #d94b3f2e; animation: pulse 1.6s ease-in-out infinite; }
+.car-status-done { background: #f1f5fb; border-color: #dbe4f1; }
+.car-status-done .car-status-dot { background: #3d6fb6; box-shadow: 0 0 0 3px #3d6fb62a; }
+.car-status-neutral { background: #f6f7f9; border-color: #e9ecf0; }
+.car-status-neutral .car-status-dot { background: #8a94a3; box-shadow: none; }
+
+.car-route { margin-top: 16px; }
+.car-progress-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 10px; color: var(--muted); }
+.car-progress-top b { font-size: 20px; letter-spacing: -.6px; color: var(--text); font-variant-numeric: tabular-nums; }
+.car-progress { height: 5px; margin-top: 6px; overflow: hidden; border-radius: 5px; background: #edf0f3; }
+.car-progress span { display: block; height: 100%; border-radius: inherit; transition: width .5s ease; }
+
+.car-steps { list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 15px 0 0; padding: 0; }
+.car-steps li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; text-align: center; color: var(--ok); }
+/* соединительная линия от предыдущего этапа */
+.car-steps li + li::before { content: ''; position: absolute; top: 7px; right: 50%; width: 100%; height: 2px; background: #a9d4c1; }
+.car-steps li.step-todo::before { background: #e6e9ee; }
+.car-steps i { position: relative; z-index: 1; display: grid; place-items: center; width: 16px; height: 16px; border: 2px solid currentColor; border-radius: 50%; background: #fff; color: #fff; }
+.car-steps .step-done i { border-color: var(--ok); background: var(--ok); }
+.car-steps .step-active i, .car-steps .step-issue i { background: radial-gradient(circle, currentColor 0 3px, #fff 3.5px); color: inherit; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 16%, transparent); }
+.car-steps .step-waiting { color: #c48a1c; }
+.car-steps .step-waiting i { border-style: dashed; color: #c48a1c; background: #fff; }
+.car-steps .step-todo i { border-color: #dfe3e8; }
+.car-steps span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 9px; font-weight: 600; color: #4f5a68; }
+.car-steps .step-todo span { font-weight: 500; color: #9aa3af; }
+.car-steps small { font-size: 8px; color: #8a94a3; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.car-steps .step-active small, .car-steps .step-issue small, .car-steps .step-waiting small { font-weight: 600; color: inherit; }
+
+.car-dates > div { align-items: baseline; }
+.car-dates dd small { display: block; font-size: 8px; font-weight: 500; color: var(--muted); }
+.car-dates dd.is-ok small { color: var(--ok); }
+.car-dates dd.is-warn small, .car-dates dd.is-warn { color: var(--warn); }
+.car-dates dd.is-bad, .car-dates dd.is-bad small { color: var(--bad); }
+
+.car-source { display: flex; align-items: flex-start; gap: 6px; margin: 14px 0 0; font-size: 8.5px; line-height: 1.6; color: #8f98a5; }
+.car-source svg { flex-shrink: 0; margin-top: 1px; }
+
+/* Метка над выбранной машиной в 3D-сцене */
+.car-pin { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 999px; background: #111a25e6; color: #fff; font: 600 10px/1.2 Manrope, sans-serif; white-space: nowrap; box-shadow: 0 3px 12px #0003; pointer-events: none; }
+.car-pin i { width: 6px; height: 6px; border-radius: 50%; background: #e84735; box-shadow: 0 0 0 3px #e8473540; }
+
+@media (max-width: 700px) {
+  .car-heading-actions { top: 9px; }
+  .car-vin code { font-size: 10px; letter-spacing: .3px; }
+  .car-route { margin-top: 14px; }
+}

@@ -27,6 +27,8 @@ const paths = {
   expand: 'M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5',
   rotate: 'M3 10a9 9 0 1 1 2 8M3 4v6h6',
   menu: 'M4 6h16M4 12h16M4 18h16',
+  car: 'M5 17H4a1 1 0 0 1-1-1v-3.5L5.2 8.1A2 2 0 0 1 7 7h10a2 2 0 0 1 1.8 1.1l2.2 4.4V16a1 1 0 0 1-1 1h-1M9 17h6M3.5 12.5h17M9 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm10 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0',
+  copy: 'M9 9h11v11H9V9ZM5 15H4V4h11v1',
 } as const
 export type IconName = keyof typeof paths
 export function Icon({ name, size = 18, className, style }: { name: IconName; size?: number; className?: string; style?: CSSProperties }) {

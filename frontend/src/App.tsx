@@ -18,9 +18,14 @@ import { LiveStrip } from './ui/LiveStrip'
 import { useSimulation } from './simulation/useSimulation'
 import { SimulationPanel, SimulationTransport } from './ui/SimulationPanel'
 import type { Stage } from './simulation/types'
+import type { Object3D } from 'three'
+import { cycleOf, unitOf, type CarSelection, type UnitPlace } from './scene/carUnits'
+import { CarPanel } from './ui/CarPanel'
 import { useAlarmSummaryKey } from './hmi/scada'
 
 const STEP_MS = 9000
+/** Машины внутри корпуса: под кровлей они не отображаются. */
+const INTERIOR = new Set<UnitPlace>(['welding', 'paint', 'pbs', 'assembly', 'qc'])
 type WorkspaceView = 'factory' | 'analytics' | 'decisions' | 'sources'
 const VIEW_TITLES: Record<WorkspaceView, string> = { factory: 'Завод в 3D', analytics: 'Аналитика', decisions: 'Центр решений', sources: 'Источники данных' }
 
@@ -89,6 +94,9 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
   const [sceneFocused, setSceneFocused] = useState(false)
   const [labels, setLabels] = useState(false)
   const [shot, setShot] = useState<Shot | null>(null)
+  const [car, setCar] = useState<CarSelection | null>(null)
+  const [follow, setFollow] = useState(false)
+  const closeCar = useCallback(() => { setCar(null); setFollow(false) }, [])
   const [step, setStep] = useState<number | null>(null)
   const [playing, setPlaying] = useState(false)
   const [navigation, setNavigation] = useState(false)
@@ -112,6 +120,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
       if (event.key !== 'Escape') return
       if (navigation) { setNavigation(false); return }
       if (view !== 'factory') return
+      if (car) { closeCar(); return }
       if (sceneFocused) { setSceneFocused(false); return }
       if (simulationMode) { setSimulationPanel(false); return }
       if (help) setHelp(false)
@@ -119,7 +128,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
     }
     window.addEventListener('keydown', closePanel)
     return () => window.removeEventListener('keydown', closePanel)
-  }, [view, navigation, help, simulationMode, sceneFocused])
+  }, [view, navigation, help, simulationMode, sceneFocused, car, closeCar])
 
   useEffect(() => {
     const desktop = window.matchMedia('(min-width: 961px)')
@@ -148,9 +157,10 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
       setStep(i)
       setRoof(s.roof)
       setSelection(findSelection(s.zone))
+      closeCar()
       setShot({ camera: s.camera, target: s.target })
     },
-    [tour, findSelection],
+    [tour, findSelection, closeCar],
   )
 
   // прямая ссылка на шаг экскурсии: ?step=5; произвольный ракурс в координатах корпуса:
@@ -184,6 +194,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
     setPlaying(false)
     setRoof(false)
     setSelection({ kind: 'zone', zone: z })
+    closeCar()
     setShot(zoneShot(plant, z))
   }
   const showArea = (area: string) => {
@@ -197,11 +208,24 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
     setStep(null)
     setPlaying(false)
     setSelection({ kind: 'outdoor', zone: z })
+    closeCar()
     setShot(outdoorShot(z))
+  }
+  const openZone = (id: string) => {
+    const zone = plant.zones.find((z) => z.id === id)
+    if (zone) { selectZone(zone); return }
+    const area = plant.outdoor.find((z) => z.id === id)
+    if (area) selectOutdoor(area)
+  }
+  const pickCar = (root: Object3D) => {
+    const unit = unitOf(root)
+    if (!unit) return
+    setView('factory'); setNavigation(false); setPlaying(false); setStep(null); setHelp(false); setSelection(null); setFollow(false)
+    setCar({ unit, root, cycle: cycleOf(root), progress: root.userData.progress ?? 0, station: root.userData.station ?? 0, at: Date.now() })
   }
 
   const selectAsset = (stage: Stage) => {
-    setRoof(false); setPlaying(false); setStep(null)
+    setRoof(false); setPlaying(false); setStep(null); setFollow(false)
     const [u, v] = stage.position
     setShot(stage.stage === 'assembly'
       ? { camera: hallToWorld(plant.hall, 100, -130, 210), target: hallToWorld(plant.hall, 210, 95, 0) }
@@ -213,6 +237,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
     // Returning to it does not accidentally toggle it off.
     if (view !== 'factory' && simulationMode) { setView('factory'); return }
     setView('factory')
+    closeCar()
     if (simulationMode) {
       if (simulation.snapshot && !await simulation.control('pause')) {
         setSimulationPanel(true)
@@ -227,24 +252,12 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
     }
   }
 
-  const overview = () => { setView('factory'); setNavigation(false); setPlaying(false); setStep(null); setSelection(null); setShot(overviewShot(plant)) }
+  const overview = () => { setView('factory'); setNavigation(false); setPlaying(false); setStep(null); setSelection(null); closeCar(); setShot(overviewShot(plant)) }
   const changeRoof = (visible: boolean) => {
     setPlaying(false)
     setRoof(visible)
-    // Following targets live inside Assembly and disappear when the roof closes.
-    // Leave ordinary roof toggles at their existing viewpoint.
-    if (visible && shot?.followOnix) overview()
-  }
-  const focusOnix = async () => {
-    if (simulation.busy) return
-    if (simulationMode && simulation.snapshot && !await simulation.control('pause')) {
-      setSimulationPanel(true)
-      return
-    }
-    setSimulationMode(false)
-    setNavigation(false); setPlaying(false); setStep(null); setSelection(null); setHelp(false)
-    setRoof(false); setDetailed(true)
-    setShot({ ...overviewShot(plant), followOnix: true })
+    // Под кровлей машины цехов не видны. Кузова симуляции карточка ведёт по данным движка.
+    if (visible && car && INTERIOR.has(car.unit.place)) closeCar()
   }
   const openWorkspace = (next: WorkspaceView) => { setNavigation(false); setPlaying(false); setHelp(false); setView(next) }
   const openAnalytics = () => openWorkspace('analytics')
@@ -252,7 +265,7 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
   const openSources = () => { openWorkspace('sources'); if (!source) refresh() }
   // сцена тяжёлая: пересоздаём элемент только при изменении её входов, а не на каждом сообщении потока
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const scene = useMemo(() => <Scene plant={plant} site={site} roof={roof} labels={labels} selection={selection} status={sceneStatus} alerts={sceneAlerts} shot={shot} mood={mood} detailed={detailed} paused={view !== 'factory'} onSelectZone={selectZone} onSelectOutdoor={selectOutdoor} simulation={simulationMode ? simulation.snapshot : null} onSelectAsset={selectAsset} onUserMove={() => setPlaying(false)} />, [plant, site, roof, labels, selection, sceneStatus, sceneAlerts, shot, mood, detailed, view, simulationMode, simulation.snapshot])
+  const scene = useMemo(() => <Scene plant={plant} site={site} roof={roof} labels={labels} selection={selection} status={sceneStatus} alerts={sceneAlerts} shot={shot} mood={mood} detailed={detailed} paused={view !== 'factory'} onSelectZone={selectZone} onSelectOutdoor={selectOutdoor} simulation={simulationMode ? simulation.snapshot : null} onSelectAsset={selectAsset} car={car} follow={follow} onSelectCar={pickCar} onUserMove={() => { setPlaying(false); setFollow(false) }} />, [plant, site, roof, labels, selection, sceneStatus, sceneAlerts, shot, mood, detailed, view, simulationMode, simulation.snapshot, car, follow])
   const bottleneck = plant.zones.find(z => z.kpiArea === insights.base.bottleneck)
 
   return (
@@ -268,12 +281,12 @@ function Twin({ plant, site, ...initial }: { plant: Plant; site: Site; kpi: Kpi;
         <div className="page-heading"><div><div className="page-eyebrow"><span />ПРОИЗВОДСТВЕННАЯ ПЛОЩАДКА</div><h1>Завод в деталях<span className="heading-dot">.</span></h1><p>Производство, процессы и решения — в одном пространстве.</p></div><div className="page-actions"><span className="date-chip"><Icon name="clock" size={15} />{fmtDate(kpi.date)}<span className="date-divider" />{sourceLabel}</span><button className="button-primary" onClick={openAnalytics}><Icon name="chart" size={16} />Аналитика<Icon name="arrow-right" size={15} /></button></div></div>
         {simulationMode ? <SimulationKpiCards simulation={simulation.snapshot} /> : <KpiCards kpi={kpi} insights={insights} onAnalytics={openAnalytics} onDecisions={openDecisions} />}
         {!simulationMode && live?.shift && <LiveStrip shift={live.shift} onArea={showArea} />}
-        <section className={`scene-stage${selection ? ' has-selection' : ''}${step !== null ? ' touring' : ''}`} aria-label="Интерактивная 3D-модель завода">
+        <section className={`scene-stage${selection || car ? ' has-selection' : ''}${step !== null ? ' touring' : ''}`} aria-label="Интерактивная 3D-модель завода">
           <div className="scene-canvas"><SceneBoundary>{scene}</SceneBoundary></div>
           <div className="stage-toolbar"><div className="stage-title"><span className="stage-icon"><Icon name="box" size={18} /></span><div><strong>Цифровой двойник</strong><span>Интерактивная модель площадки</span></div><span className="stage-badge">3D</span></div><div className="stage-modes" role="group" aria-label="Отображение завода"><button aria-pressed={roof} className={roof ? 'active' : ''} onClick={() => changeRoof(true)}><Icon name="roof" size={15} />Площадка</button><button aria-pressed={!roof} className={!roof ? 'active' : ''} onClick={() => changeRoof(false)}><Icon name="layers" size={15} />Цеха</button></div><div className="stage-actions"><button className="icon-button" aria-label={mood === 'day' ? 'Включить вечернее освещение' : 'Включить дневное освещение'} title={mood === 'day' ? 'Свет: день' : 'Свет: золотой час'} onClick={() => setMood(mood === 'day' ? 'sunset' : 'day')}><Icon name={mood === 'day' ? 'sun' : 'moon'} /></button><button className={`icon-button${detailed ? ' selected' : ''}`} aria-pressed={detailed} aria-label="Детальное качество изображения" title={detailed ? 'Качество: высокое. Нажмите для экономичного режима' : 'Качество: экономичное. Нажмите для высокого качества'} onClick={() => setDetailed(v => !v)}><Icon name="settings" /></button><button className={`icon-button${sceneFocused ? ' selected' : ''}`} aria-label={sceneFocused ? 'Свернуть 3D-сцену' : 'Развернуть 3D-сцену'} aria-pressed={sceneFocused} title={sceneFocused ? 'Вернуть показатели · Escape' : 'Развернуть 3D-сцену'} onClick={() => setSceneFocused(v => !v)}><Icon name="expand" /></button><button className={`icon-button${help ? ' selected' : ''}`} aria-label="Как управлять моделью" aria-expanded={help} aria-controls="scene-help" onClick={() => setHelp(v => !v)}><Icon name="info" /></button></div></div>
-          {help && <div className="scene-help" id="scene-help"><strong>Исследуйте завод</strong><p>Перетаскивание — поворот камеры.<br />Колесо мыши — приближение.<br />Правая кнопка — перемещение.</p><p>На телефоне: один палец — поворот,<br />два пальца — масштаб и перемещение.</p><span>Выберите участок, чтобы увидеть детали.</span><button className="text-button" onClick={() => setHelp(false)}>Понятно <Icon name="check" size={14} /></button></div>}
-          <div className="scene-topline"><span className="model-note"><span />{roof ? 'Внешний вид площадки' : 'Внутреннее устройство'}<span className="model-note-divider">/</span>Реконструкция</span><button className="bottleneck-chip" disabled={simulation.busy} onClick={() => void focusOnix()} title="Приблизить Chevrolet Onix и следовать за ним. Перетаскивание останавливает слежение."><Icon name="search" size={13} />Рассмотреть Onix</button>{bottleneck && <button className="bottleneck-chip" onClick={() => selectZone(bottleneck)}><Icon name="alert" size={13} />Узкое место: {insights.base.bottleneck.toLowerCase()}<Icon name="chevron-right" size={13} /></button>}</div>
-          <div className="scene-panels">{simulationMode ? simulationPanel && <SimulationPanel simulation={simulation} onAsset={selectAsset} onHide={() => setSimulationPanel(false)} /> : <ZonePanel key={selection?.zone.id} plant={plant} kpi={kpi} insights={insights} onDecisions={openDecisions} selection={selection} onClose={() => setSelection(null)} />}</div>
+          {help && <div className="scene-help" id="scene-help"><strong>Исследуйте завод</strong><p>Перетаскивание — поворот камеры.<br />Колесо мыши — приближение.<br />Правая кнопка — перемещение.</p><p>На телефоне: один палец — поворот,<br />два пальца — масштаб и перемещение.</p><span>Нажмите на участок или машину, чтобы увидеть детали.</span><button className="text-button" onClick={() => setHelp(false)}>Понятно <Icon name="check" size={14} /></button></div>}
+          <div className="scene-topline"><span className="model-note"><span />{roof ? 'Внешний вид площадки' : 'Внутреннее устройство'}<span className="model-note-divider">/</span>Реконструкция</span>{bottleneck && <button className="bottleneck-chip" onClick={() => selectZone(bottleneck)}><Icon name="alert" size={13} />Узкое место: {insights.base.bottleneck.toLowerCase()}<Icon name="chevron-right" size={13} /></button>}</div>
+          <div className="scene-panels">{car ? <CarPanel key={`${car.unit.key}@${car.at}`} car={car} alerts={sceneAlerts} simulation={simulationMode ? simulation.snapshot : null} following={follow} onFollow={setFollow} onZone={simulationMode ? undefined : openZone} onClose={closeCar} /> : simulationMode ? simulationPanel && <SimulationPanel simulation={simulation} onAsset={selectAsset} onHide={() => setSimulationPanel(false)} /> : <ZonePanel key={selection?.zone.id} plant={plant} kpi={kpi} insights={insights} onDecisions={openDecisions} selection={selection} onClose={() => setSelection(null)} />}</div>
           <div className="scene-bottom"><div className="scene-legend"><span><i className="legend-ok" />В норме</span><span><i className="legend-warn" />Внимание</span><span><i className="legend-bad" />Отклонение</span></div>{simulationMode ? <SimulationTransport simulation={simulation} panel={simulationPanel} onPanel={() => setSimulationPanel((v) => !v)} roof={roof} onRoof={() => changeRoof(!roof)} onOverview={() => { overview(); changeRoof(true) }} /> : <TourBar stops={tour} index={step} playing={playing} roof={roof} labels={labels} onPlay={() => { setPlaying(true); goTo(step === null || step >= tour.length - 1 ? 0 : step) }} onStop={() => setPlaying(false)} onStep={goTo} onRoof={() => changeRoof(!roof)} onLabels={() => setLabels(l => !l)} onOverview={overview} />}<div className="scene-hint"><Icon name="rotate" size={13} />Вращайте · приближайте · исследуйте</div></div>
         </section>
         <footer className="workspace-footer"><span><span className="footer-dot" />{source?.source ?? 'Данные кейса'} · {fmtDate(kpi.date)}<span className="footer-separator">|</span>Движение в сцене — симуляция</span><span className="attrib">Геометрия: © OpenStreetMap<span className="footer-separator">|</span>Расстановка: НДВ, 2022<span className="footer-separator">|</span><a href="/models/credits.html" target="_blank" rel="noopener noreferrer">3D-модели</a></span></footer>

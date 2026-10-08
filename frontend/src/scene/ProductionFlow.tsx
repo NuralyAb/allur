@@ -7,6 +7,7 @@ import { STATE_LABELS, type SimulationSnapshot, type Stage, type Vehicle } from 
 import { ASM_PATH, QC_PATH } from './Assembly'
 import { PATH as PAINT_PATH } from './Paint'
 import { Car, type CarHandle } from './Car'
+import type { CarUnit } from './carUnits'
 import { CAR_COLORS, MAT, paint } from './assets'
 import { makePath, placeOnPath, type P3 } from './motion'
 
@@ -17,6 +18,8 @@ const PATHS: Record<Vehicle['stage'], P3[]> = {
   qc: QC_PATH,
 }
 const diagnostics = new URLSearchParams(window.location.search).has('e2e')
+/** Кузов движка: одна метка у машины на линии и у выпущенной — карточка не теряет её при выпуске. */
+const simUnit = (id: string, model: Vehicle['model']): CarUnit => ({ key: `sim:${id}`, place: 'sim', model, color: CAR_COLORS[Number(id.slice(-3)) % 5], index: 0, body: id })
 const QUEUES: Record<Vehicle['stage'], { start: P3; direction: P3 }> = {
   welding: { start: [56, 0.55, -68], direction: [0, 0, -5] },
   paint: { start: [250, 0.55, -84], direction: [-6, 0, 0] },
@@ -29,6 +32,7 @@ function SimulatedVehicle({ vehicle }: { vehicle: Vehicle }) {
   const data = useProductionData()
   const path = useMemo(() => makePath(PATHS[vehicle.stage], 3.5), [vehicle.stage])
   const length = useMemo(() => path.getLength(), [path])
+  const unit = useMemo(() => simUnit(vehicle.id, vehicle.model), [vehicle.id, vehicle.model])
   useFrame((_, dt) => {
     const car = ref.current, snapshot = data?.current.snapshot
     if (!car || !snapshot || !data) return
@@ -45,11 +49,16 @@ function SimulatedVehicle({ vehicle }: { vehicle: Vehicle }) {
     }
     const assembled = vehicle.stage === 'qc' || (vehicle.stage === 'assembly' && progress > 0.65)
     car.setWheels(assembled); car.setGlass(assembled ? MAT.glass : MAT.opening); car.setDetails(assembled)
-    car.setBody(vehicle.stage === 'welding' || vehicle.stage === 'paint' && (vehicle.status === 'queued' || progress < 0.2) ? MAT.biw : vehicle.stage === 'paint' && progress < 0.6 ? MAT.ed : paint(CAR_COLORS[Number(vehicle.id.slice(-3)) % 5]))
+    car.setBody(vehicle.stage === 'welding' || vehicle.stage === 'paint' && (vehicle.status === 'queued' || progress < 0.2) ? MAT.biw : vehicle.stage === 'paint' && progress < 0.6 ? MAT.ed : paint(unit.color))
     if (snapshot.running && stage.state === 'RUN' && vehicle.status === 'processing') car.wheels.children.forEach((wheel) => { wheel.rotation.z -= dt * 2 })
     car.root.userData.bodyId = vehicle.id
   }, -1)
-  return <Car ref={ref} model={vehicle.model} />
+  return <Car ref={ref} model={vehicle.model} unit={unit} />
+}
+
+function FinishedVehicle({ id, model, position }: { id: string; model: Vehicle['model']; position: [number, number, number] }) {
+  const unit = useMemo(() => simUnit(id, model), [id, model])
+  return <Car model={model} body={paint(unit.color)} glass={MAT.glass} wheels details position={position} unit={unit} />
 }
 
 function EquipmentMarker({ stage, roof, onSelect }: { stage: Stage; roof: boolean; onSelect: (stage: Stage) => void }) {
@@ -77,7 +86,7 @@ export function ProductionFlow({ snapshot, roof, onAsset }: { snapshot: Simulati
   })
   return <group ref={group}>
     {!roof && snapshot.vehicles.map((vehicle) => <SimulatedVehicle key={vehicle.id} vehicle={vehicle} />)}
-    {snapshot.finishedVehicles.map((vehicle, i) => <Car key={vehicle.id} model={vehicle.model} body={paint(CAR_COLORS[Number(vehicle.id.slice(-3)) % 5])} glass={MAT.glass} wheels details position={[38 + i * 6, 0.3, -400]} />)}
+    {snapshot.finishedVehicles.map((vehicle, i) => <FinishedVehicle key={vehicle.id} id={vehicle.id} model={vehicle.model} position={[38 + i * 6, 0.3, -400]} />)}
     {!roof && <group position={[313, 8, -74]}><Html center zIndexRange={[24, 0]}><button className="equipment-marker" onClick={() => onAsset(snapshot.stages[2])} aria-label="Показать буфер PBS"><b>Буфер PBS</b><span>{snapshot.stages[2].queue} / {snapshot.config.bufferCapacity} кузовов</span></button></Html></group>}
     {snapshot.stages.map((stage) => <EquipmentMarker key={stage.id} stage={stage} roof={roof} onSelect={onAsset} />)}
   </group>

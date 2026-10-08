@@ -10,6 +10,7 @@ import { hallToWorld, world } from './geo'
 import { Instanced } from './Hall'
 import { makePath, mod, placeOnPath, type P3 } from './motion'
 import { pickModel } from './carModels'
+import { track, type CarUnit } from './carUnits'
 import { ParkedCars, type ParkedCar } from './ParkedCars'
 import { surfaceTile } from './surfaces'
 import { OUTBOUND_ROUTE, ROAD_TURN_RADIUS } from './exteriorLayout'
@@ -133,7 +134,8 @@ function FinishedLot({ zone }: { zone: OutdoorZone }) {
           const c = rnd(k++)
           // основной поток — белые и серебристые машины, как на спутниковом снимке
           const color = c < 0.45 ? CAR_COLORS[0] : c < 0.7 ? CAR_COLORS[2] : c < 0.85 ? CAR_COLORS[1] : CAR_COLORS[3 + (k % 2)]
-          out.push({ p: [x, 0, z + side], r: Math.PI / 2, color, model: pickModel(k) })
+          const model = pickModel(k)
+          out.push({ p: [x, 0, z + side], r: Math.PI / 2, color, model, unit: { key: `finished:${out.length}`, place: 'finished', model, color, index: out.length } })
         }
       }
     }
@@ -149,6 +151,8 @@ function FinishedLot({ zone }: { zone: OutdoorZone }) {
   }, [zone])
   return <><ParkedCars cars={cars} /><Instanced geometry={unitBox} material={parkingMarkMat} items={marks} /></>
 }
+
+const TEST_UNIT: CarUnit = { key: 'testtrack:0', place: 'testtrack', model: 'onix', color: CAR_COLORS[3], index: 0 }
 
 function TestTrack({ zone }: { zone: OutdoorZone }) {
   const simulated = useProductionEnabled()
@@ -167,7 +171,9 @@ function TestTrack({ zone }: { zone: OutdoorZone }) {
   useFrame(({ clock }, delta) => {
     const c = car.current
     if (!c) return
-    const t = (clock.elapsedTime * 0.035) % 1
+    const lap = clock.elapsedTime * 0.035
+    const t = lap % 1
+    track(c.root, t, 1, Math.floor(lap))
     curve.getPointAt(t, c.root.position)
     curve.getTangentAt(t, tmp)
     c.root.rotation.y = Math.atan2(-tmp.z, tmp.x)
@@ -187,7 +193,7 @@ function TestTrack({ zone }: { zone: OutdoorZone }) {
     <group>
       <Line points={marks} color="#e2d7a1" lineWidth={1} dashed dashSize={2.5} gapSize={2.5} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-4} />
       {edgeMarks.map((points, i) => <Line key={i} points={points} color="#dddcd0" lineWidth={1.4} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-4} />)}
-      {!simulated && <Car ref={car} model="onix" body={paint(CAR_COLORS[3])} glass={MAT.glass} wheels details />}
+      {!simulated && <Car ref={car} model="onix" body={paint(CAR_COLORS[3])} glass={MAT.glass} wheels details unit={TEST_UNIT} />}
       <Instanced geometry={coneGeo} material={coneMat} items={cones} castShadow />
       <Instanced geometry={coneBandGeo} material={parkingMarkMat} items={cones.map((item) => ({ ...item, p: [item.p[0], 0.4, item.p[2]] }))} />
       <Instanced geometry={unitBox} material={coneBase} items={cones.map((item) => ({ p: [item.p[0], 0.035, item.p[2]], s: [0.5, 0.07, 0.5] }))} />
@@ -202,24 +208,32 @@ function Outbound({ frame }: { frame: HallFrame }) {
   }, [frame])
   const len = useMemo(() => path.getLength(), [path])
   const refs = useRef<(CarHandle | null)[]>([])
+  const count = Math.floor(len / 38)
+  const units = useMemo(() => Array.from({ length: count }, (_, i): CarUnit => ({
+    key: `outbound:${i}`, place: 'outbound', model: pickModel(i), color: CAR_COLORS[i % 5], index: i,
+  })), [count])
   useFrame(({ clock }, delta) => {
     refs.current.forEach((c, i) => {
       if (!c) return
-      placeOnPath(path, len, mod(clock.elapsedTime * 3.2 + i * 38, len), c.root)
+      const travel = clock.elapsedTime * 3.2 + i * 38
+      const dist = mod(travel, len)
+      placeOnPath(path, len, dist, c.root)
+      track(c.root, dist / len, 1, Math.floor(travel / len))
       c.wheels.children.forEach((w) => (w.rotation.z -= delta * 3.2 / 0.315))
     })
   })
   return (
     <group>
-      {Array.from({ length: Math.floor(len / 38) }, (_, i) => (
+      {units.map((unit, i) => (
         <Car
           key={i}
           ref={(c) => void (refs.current[i] = c)}
-          model={pickModel(i)}
-          body={paint(CAR_COLORS[i % 5])}
+          model={unit.model}
+          body={paint(unit.color)}
           glass={MAT.glass}
           wheels
           details
+          unit={unit}
         />
       ))}
     </group>

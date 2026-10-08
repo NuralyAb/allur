@@ -29,9 +29,11 @@ export interface CarSelection {
   root: Object3D | null
   /** Круг петли на момент выбора: на следующем круге по этому месту едет уже другая машина. */
   cycle: number
+  /** Положение на участке в момент выбора: от него строятся сроки. */
+  progress: number
+  station: number
   /** Момент выбора: от него считаются сценарные сроки. */
   at: number
-  sessionId?: string
 }
 
 export const unitOf = (o: Object3D): CarUnit | undefined => o.userData.unit

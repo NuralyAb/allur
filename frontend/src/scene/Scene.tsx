@@ -2,7 +2,7 @@ import { CameraControls, PerformanceMonitor } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Bloom, EffectComposer, N8AO, SMAA, Vignette } from '@react-three/postprocessing'
 import { memo, Suspense, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { ACESFilmicToneMapping, PCFShadowMap, Quaternion, Vector3, type Group } from 'three'
+import { ACESFilmicToneMapping, PCFShadowMap, Quaternion, Vector3, type Object3D } from 'three'
 import type { Plant, Selection, Site, XY, Zone, OutdoorZone } from '../types'
 import { Assembly as AssemblyLine } from './Assembly'
 import { hallToWorld, world, worldToHall } from './geo'
@@ -22,6 +22,8 @@ import { VehicleFleetProvider } from './VehicleFleet'
 import { ProductionProvider, StageScope } from '../simulation/ProductionClock'
 import type { SimulationSnapshot, Stage } from '../simulation/types'
 import { ProductionFlow } from './ProductionFlow'
+import { CarPicker } from './CarPicker'
+import type { CarSelection } from './carUnits'
 
 const debugPerf = new URLSearchParams(window.location.search).has('perf')
 
@@ -45,7 +47,6 @@ export interface Shot {
   camera: Vector3
   target: Vector3
   fitOverview?: boolean
-  followOnix?: boolean
 }
 
 interface Props {
@@ -65,6 +66,10 @@ interface Props {
   onSelectAsset: (stage: Stage) => void
   onSelectZone: (z: Zone) => void
   onSelectOutdoor: (z: OutdoorZone) => void
+  car: CarSelection | null
+  /** камера следует за выбранной машиной */
+  follow: boolean
+  onSelectCar: (car: Object3D) => void
   onUserMove: () => void
 }
 
@@ -96,7 +101,7 @@ export function overviewShot(plant: Plant): Shot {
   }
 }
 
-function CameraRig({ shot, onix, onUserMove }: { shot: Shot | null; onix: RefObject<Group | null>; onUserMove: () => void }) {
+function CameraRig({ shot, follow, followed, onUserMove }: { shot: Shot | null; follow: boolean; followed: RefObject<Object3D | null>; onUserMove: () => void }) {
   const ref = useRef<CameraControls>(null!)
   const gl = useThree((s) => s.gl)
   const size = useThree((s) => s.size)
@@ -113,15 +118,18 @@ function CameraRig({ shot, onix, onUserMove }: { shot: Shot | null; onix: RefObj
   const followTarget = useMemo(() => new Vector3(), [])
   const followCamera = useMemo(() => new Vector3(), [])
   const orientation = useMemo(() => new Quaternion(), [])
+  useEffect(() => { manuallyMoved.current = false }, [shot])
   useEffect(() => {
-    following.current = !!shot?.followOnix
-    manuallyMoved.current = false
-  }, [shot])
+    following.current = follow
+    // после слежения камера уже не в кадре shot: изменение размера не должно возвращать её туда
+    if (follow) manuallyMoved.current = true
+  }, [follow])
   useFrame(({ camera }, delta) => {
     if (!shot || !destination || !ref.current) return
-    if (following.current && onix.current) {
-      onix.current.getWorldPosition(followTarget)
-      onix.current.getWorldQuaternion(orientation)
+    const car = followed.current
+    if (following.current && car) {
+      car.getWorldPosition(followTarget)
+      car.getWorldQuaternion(orientation)
       followTarget.y += 0.8
       // Front three-quarter view, with room for the full car on narrow screens.
       const fit = Math.max(1, 1.1 / (Math.max(1, size.width) / Math.max(1, size.height)))
@@ -133,7 +141,6 @@ function CameraRig({ shot, onix, onUserMove }: { shot: Shot | null; onix: RefObj
       gl.domElement.dataset.cameraSettled = String(target.distanceToSquared(followTarget) < 0.04)
       return
     }
-    if (shot.followOnix) return
     ref.current.getTarget(target)
     const settled = camera.position.distanceToSquared(destination) < 0.01 && target.distanceToSquared(shot.target) < 0.01
     const value = String(settled)
@@ -143,7 +150,7 @@ function CameraRig({ shot, onix, onUserMove }: { shot: Shot | null; onix: RefObj
     if (!shot || !destination || !ref.current) return
     // Resize may refit an untouched shot, but must preserve a manually chosen view.
     // A new shot resets manuallyMoved above and applies its requested framing.
-    if (shot.followOnix || manuallyMoved.current) return
+    if (manuallyMoved.current) return
     gl.domElement.dataset.cameraSettled = 'false'
     ref.current.smoothTime = 1.1
     const animate = initialized.current && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -221,12 +228,12 @@ function SceneReady() {
   return null
 }
 
-export function Scene({ plant, site, roof, labels, status, alerts, selection, shot, mood, detailed, paused = false, simulation = null, onSelectAsset, onSelectZone, onSelectOutdoor, onUserMove }: Props) {
+export function Scene({ plant, site, roof, labels, status, alerts, selection, shot, mood, detailed, paused = false, simulation = null, car, follow, onSelectAsset, onSelectZone, onSelectOutdoor, onSelectCar, onUserMove }: Props) {
   const frame = plant.hall
   const outline = useMemo<XY[]>(() => site.hall.map((p) => worldToHall(frame, p)), [site, frame])
   const origin = world(frame.origin[0], frame.origin[1])
   const overview = useMemo(() => overviewShot(plant), [plant])
-  const onix = useRef<Group | null>(null)
+  const followed = useRef<Object3D | null>(null)
   // Качество подстраивается под FPS: сначала снижается плотность пикселей, затем отключаются
   // свечение и затенение. На Retina стартуем с 1,5, на слабой встроенной графике доходим до минимума.
   const [tier, setTier] = useState(TOP_TIER)
@@ -269,7 +276,7 @@ export function Scene({ plant, site, roof, labels, status, alerts, selection, sh
           <>
             <StageScope stage="welding"><Welding /></StageScope>
             <StageScope stage="paint"><Paint /></StageScope>
-            <StageScope stage="assembly"><Assembly detailed={detailed} onixRef={onix} /> </StageScope>
+            <StageScope stage="assembly"><Assembly detailed={detailed} /></StageScope>
             <Logistics />
             <Services />
           </>
@@ -279,10 +286,11 @@ export function Scene({ plant, site, roof, labels, status, alerts, selection, sh
 
       <Outdoor frame={frame} zones={plant.outdoor} />
       </ProductionProvider>
+      <CarPicker selection={car} onPick={onSelectCar} followed={followed} />
       </VehicleFleetProvider></GlbAssetsProvider>
       <OutdoorZones zones={plant.outdoor} frame={frame} selection={selection} onSelect={onSelectOutdoor} labels={labels} />
 
-      <CameraRig shot={shot ?? overview} onix={onix} onUserMove={onUserMove} />
+      <CameraRig shot={shot ?? overview} follow={follow} followed={followed} onUserMove={onUserMove} />
       {debugPerf && <Perf />}
 
       <Effects ao={detailed && tier >= 1} bloom={tier >= 3} msaa={tier >= 2} />
