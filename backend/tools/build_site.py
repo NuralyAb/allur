@@ -1,4 +1,4 @@
-"""Собирает backend/app/data/site.json из OpenStreetMap.
+"""Собирает backend/app/data/site.json из OpenStreetMap (запуск из корня: python backend/tools/build_site.py).
 
 Источник: OSM way 164635178 (территория Allur) и здания вокруг,
 ул. Промышленная, 41, Костанай. Координаты переводятся в локальные метры
@@ -23,7 +23,8 @@ OVERPASS = [
     "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ]
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+# скрипт лежит в backend/tools, корень репозитория — на два уровня выше
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "backend" / "app" / "data" / "site.json"
 
 

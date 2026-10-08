@@ -13,8 +13,8 @@ PROJECT_DIR = BACKEND_DIR.parent
 DATA_DIR = APP_DIR / "data"
 VAR_DIR = BACKEND_DIR / "data"
 
-# тестовые данные организаторов: при первом запуске разбираются в хранилище
-CASE_FILE = PROJECT_DIR / "Кейс_Цифровой_двойник_Тестовые_данные.docx"
+# тестовые данные организаторов (docs/case): при первом запуске разбираются в хранилище
+CASE_FILE = PROJECT_DIR / "docs" / "case" / "Кейс_Цифровой_двойник_Тестовые_данные.docx"
 TWIN_DB = Path(os.environ.get("TWIN_DB", VAR_DIR / "twin.db"))
 
 MAX_UPLOAD = 10 * 1024 * 1024
