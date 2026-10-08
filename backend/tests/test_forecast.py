@@ -4,7 +4,9 @@ import unittest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services import forecast, importers, insights
+from app.services import data_source, forecast, importers, insights
+
+data_source.seed_if_empty()  # calibrate() без аргументов читает общее хранилище; в чистом окружении оно пустое
 
 CASE = {**importers.case_dataset(), "source": "test", "updatedAt": None}
 

@@ -4,7 +4,10 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app.services import data_source
 from app.services.simulation import Engine, SimulationConfig, CompareRequest, Session, compare
+
+data_source.seed_if_empty()  # compare() читает общее хранилище; в чистом окружении оно пустое
 
 
 class SimulationTests(unittest.TestCase):
