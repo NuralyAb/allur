@@ -42,6 +42,8 @@ export interface ControllerState {
 }
 export interface Alarm {
   id: string; controller: string; kind: string; priority: 1 | 2 | 3; message: string; value: number | null
+  /** короткий заголовок без текущих значений — для меток на 3D-модели */
+  title: string
   active: boolean; acked: boolean; since: number; rtnAt: number | null; ackBy: string | null; ackAt: number | null
   shelvedUntil: number | null; shelvedBy: string | null; shelveReason: string | null
 }
@@ -136,6 +138,54 @@ export const api = {
   events: () => call<DowntimeEvent[]>('/events?limit=100'),
   field: (controller: string, action: 'fault' | 'estop' | 'release' | 'local' | 'remote', code?: number) =>
     call(`/sim/${controller}`, { action, code }),
+}
+
+/**
+ * Общий источник состояния SCADA для цифрового двойника: один опрос на страницу, сколько бы
+ * подписчиков ни было (метки оборудования в 3D, список контроллеров в карточке цеха).
+ * Пульт HMI пользуется потоком useScadaState — там нужна частота два раза в секунду.
+ */
+const feed = {
+  config: null as ScadaConfig | null,
+  state: null as ScadaState | null,
+  offline: false,
+  subs: new Set<() => void>(),
+  timer: undefined as ReturnType<typeof setInterval> | undefined,
+}
+
+function feedNotify() {
+  for (const fn of feed.subs) fn()
+}
+
+function feedTick() {
+  if (!feed.config) api.config().then((c) => { feed.config = c; feedNotify() }, () => null)
+  api.state().then(
+    (s) => { feed.state = s; feed.offline = false; feedNotify() },
+    () => { feed.offline = true; feedNotify() },
+  )
+}
+
+export function useScadaFeed(enabled = true) {
+  const [, bump] = useState(0)
+  useEffect(() => {
+    if (!enabled) return
+    const fn = () => bump((n) => n + 1)
+    feed.subs.add(fn)
+    if (!feed.timer) {
+      feedTick()
+      feed.timer = setInterval(feedTick, 2500)
+    } else if (feed.state) {
+      fn()
+    }
+    return () => {
+      feed.subs.delete(fn)
+      if (feed.subs.size === 0) {
+        clearInterval(feed.timer)
+        feed.timer = undefined
+      }
+    }
+  }, [enabled])
+  return { config: feed.config, state: feed.state, offline: feed.offline }
 }
 
 export type Link = 'ws' | 'http' | 'offline'

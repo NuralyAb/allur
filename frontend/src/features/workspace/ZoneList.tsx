@@ -120,6 +120,12 @@ export function ZoneList({ view, plant, status, selection, insights, open, colla
             <span className="sidebar-nav-copy"><strong>{section.title}</strong><small>{section.subtitle}</small></span>
             {section.id === 'decisions' && alerts > 0 ? <span className="nav-count" id="sidebar-alert-count" aria-label={`Критических отклонений: ${alerts}`}>{alerts}</span> : view === section.id && <span className="sidebar-active-mark" />}
           </button>)}
+          {/* Пульт HMI — отдельная страница на панельных ПК у линии, поэтому ссылка, а не раздел двойника */}
+          <a className="primary-nav-link" href="/hmi.html" target="allur-hmi" title="Пульт управления линиями: тревоги, команды, уставки" aria-label="Пульт HMI — управление контроллерами линий">
+            <span className="sidebar-nav-icon"><Icon name="wrench" size={19} /></span>
+            <span className="sidebar-nav-copy"><strong>Пульт HMI</strong><small>Управление контроллерами</small></span>
+            <Icon className="primary-nav-out" name="arrow-right" size={14} />
+          </a>
         </nav>
         <button className="sidebar-compact-search" onClick={openSearch} aria-label="Найти участок завода" title="Найти участок завода · /"><Icon name="search" size={19} /></button>
         {factory ? <section className="sidebar-zones" aria-labelledby="sidebar-zones-title">

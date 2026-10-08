@@ -390,28 +390,53 @@ function useModal() {
   return ref
 }
 
+/** Демонстрационные роли: вход одним нажатием, учётные данные подставляются. На заводе — AD/LDAP. */
+const DEMO_ROLES = [
+  { login: 'operator', title: 'Диспетчер смены', role: 'Оператор', can: 'Пуск, стоп, сброс, удержание, квитирование тревог' },
+  { login: 'engineer', title: 'Инженер АСУ ТП', role: 'Инженер', can: 'То же плюс режимы, уставки, скорость, отложение тревог' },
+  { login: 'admin', title: 'Администратор', role: 'Администратор', can: 'Полные права: оборудование, настройки, учётные записи' },
+]
+
 function LoginDialog({ demo, onClose, onLogin }: { demo: boolean; onClose: () => void; onLogin: (u: User) => void }) {
   const ref = useModal()
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setBusy(true)
+  const [busy, setBusy] = useState<string | null>(null)
+  const enter = async (user: string, pass: string) => {
+    setBusy(user)
     setError(null)
-    try { onLogin(await api.login(login.trim(), password)) } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+    try { onLogin(await api.login(user.trim(), pass)) } catch (err) { setError((err as Error).message) } finally { setBusy(null) }
+  }
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    void enter(login, password)
   }
   return (
-    <dialog ref={ref} className="hmi-dialog" aria-labelledby="login-title" onCancel={onClose}>
+    <dialog ref={ref} className="hmi-dialog login" aria-labelledby="login-title" onCancel={onClose}>
       <form onSubmit={submit}>
         <h2 id="login-title">Вход в пульт управления</h2>
         <p className="fp-meta">Смотреть может любой в сети завода. Команды, квитирование и уставки — после входа; каждое действие записывается в журнал от вашего имени.</p>
-        <label>Логин<input autoFocus autoComplete="username" value={login} onChange={(e) => setLogin(e.target.value)} required /></label>
-        <label>Пароль<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+        {demo && (
+          <div className="roles">
+            <span className="fp-kicker">Демонстрация · вход одним нажатием</span>
+            {DEMO_ROLES.map((r) => (
+              <button key={r.login} type="button" className="role" disabled={!!busy} onClick={() => { setLogin(r.login); setPassword(r.login); void enter(r.login, r.login) }}>
+                <span className="role-head"><b>{r.title}</b><span className="role-tag">{r.role}</span></span>
+                <small>{r.can}</small>
+                <code>{r.login} / {r.login}</code>
+              </button>
+            ))}
+          </div>
+        )}
+        <details className="login-manual" open={!demo}>
+          <summary>Ввести логин и пароль</summary>
+          <label>Логин<input autoComplete="username" value={login} onChange={(e) => setLogin(e.target.value)} required={!demo} /></label>
+          <label>Пароль<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required={!demo} /></label>
+          <div className="dialog-actions"><button className="mini primary" disabled={!!busy}>Войти</button></div>
+        </details>
         {error && <p className="form-error" role="alert">{error}</p>}
-        {demo && <p className="demo-accounts">Демо-учётки: <code>operator</code> / <code>operator</code> — оператор, <code>engineer</code> / <code>engineer</code> — инженер АСУ ТП.</p>}
-        <div className="dialog-actions"><button type="button" className="mini" onClick={onClose}>Отмена</button><button className="mini primary" disabled={busy}>Войти</button></div>
+        <div className="dialog-actions"><button type="button" className="mini" onClick={onClose}>Отмена</button></div>
       </form>
     </dialog>
   )

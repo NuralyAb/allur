@@ -24,6 +24,7 @@ import type { SimulationSnapshot, Stage } from '../features/simulation/types'
 import { ProductionFlow } from './vehicles/ProductionFlow'
 import { CarPicker } from './vehicles/CarPicker'
 import type { CarSelection } from './vehicles/carUnits'
+import { ControllerPins } from './core/ControllerPins'
 
 const debugPerf = new URLSearchParams(window.location.search).has('perf')
 
@@ -101,6 +102,24 @@ export function overviewShot(plant: Plant): Shot {
   }
 }
 
+/** Усиление для мелких дельт трекпада. */
+const MAX_DOLLY_SPEED = 4
+/** Для крупных дельт — колесо мыши, щипок на тач-экране — усиление уже не нужно. */
+const BASE_DOLLY_SPEED = 1.7
+
+/**
+ * Шаг зума пропорционален deltaY, а устройства присылают её в очень разном масштабе: трекпад —
+ * единицы пикселей за событие, колесо мыши — сразу ~100. С единой скоростью трекпад получается
+ * слишком медленным для диапазона 4–1600 м, поэтому мелкие дельты усиливаем вчетверо, а на
+ * крупных остаёмся на базовой скорости: там шаг и так ощутимый.
+ */
+function wheelDollySpeed(event: WheelEvent): number {
+  // deltaMode 1 — это строки, а не пиксели (Firefox): переводим в пиксели по высоте строки.
+  const step = Math.abs(event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY)
+  if (step < 1) return MAX_DOLLY_SPEED
+  return Math.min(MAX_DOLLY_SPEED, Math.max(BASE_DOLLY_SPEED, 50 / step))
+}
+
 function CameraRig({ shot, follow, followed, onUserMove }: { shot: Shot | null; follow: boolean; followed: RefObject<Object3D | null>; onUserMove: () => void }) {
   const ref = useRef<CameraControls>(null!)
   const gl = useThree((s) => s.gl)
@@ -157,12 +176,30 @@ function CameraRig({ shot, follow, followed, onUserMove }: { shot: Shot | null; 
     void ref.current.setLookAt(destination.x, destination.y, destination.z, shot.target.x, shot.target.y, shot.target.z, animate)
     initialized.current = true
   }, [shot, destination, gl])
+  useEffect(() => {
+    const canvas = gl.domElement
+    // Слушаем на всплытии: обработчик контролов висит на том же элементе, и порядок между
+    // ними не гарантирован. Если наш сработает вторым, новая скорость применится со следующего
+    // события колеса — внутри одного жеста это незаметно.
+    const onWheel = (event: WheelEvent) => { if (ref.current) ref.current.dollySpeed = wheelDollySpeed(event) }
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === 'touch' && ref.current) ref.current.dollySpeed = BASE_DOLLY_SPEED
+    }
+    canvas.addEventListener('wheel', onWheel, { passive: true })
+    canvas.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      canvas.removeEventListener('wheel', onWheel)
+      canvas.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [gl])
   return (
     <CameraControls
       ref={ref}
       makeDefault
       minDistance={4}
       maxDistance={1600}
+      // Фактическая скорость выставляется по типу жеста, см. wheelDollySpeed.
+      dollySpeed={BASE_DOLLY_SPEED}
       maxPolarAngle={Math.PI / 2 - 0.03}
       // Wheel gestures emit control, while mouse/touch dragging also emits controlstart.
       onStart={() => { following.current = false; manuallyMoved.current = true; onUserMove() }}
@@ -279,6 +316,8 @@ export function Scene({ plant, site, roof, labels, status, alerts, selection, sh
             <StageScope stage="assembly"><Assembly detailed={detailed} /></StageScope>
             <Logistics />
             <Services />
+            {/* клик по оборудованию открывает пульт HMI его контроллера */}
+            <ControllerPins />
           </>
         )}
         {simulation && <ProductionFlow snapshot={simulation} roof={roof} onAsset={onSelectAsset} />}

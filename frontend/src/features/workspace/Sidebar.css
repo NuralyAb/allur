@@ -19,6 +19,11 @@
 .zonelist .sidebar-nav-copy strong { font-size: 13px; line-height: 1.25; font-weight: 600; white-space: nowrap; }
 .zonelist .sidebar-nav-copy small { color: #667085; font-size: 10.5px; line-height: 1.3; font-weight: 400; white-space: nowrap; }
 .zonelist .primary-nav button.active .sidebar-nav-copy small { color: #98533f; }
+/* Ссылка на пульт HMI: выглядит как раздел, но открывает отдельную страницу пульта */
+.zonelist .primary-nav-link { position: relative; display: flex; align-items: center; gap: 10px; min-height: 65px; padding: 10px 11px; margin: 0; border-radius: 9px; color: #344054; text-decoration: none; }
+.zonelist .primary-nav-link:hover { background: #edf0f4; color: #27313f; }
+.zonelist .primary-nav-link:focus-visible { outline: 2px solid #c4563f; outline-offset: 2px; }
+.zonelist .primary-nav-out { color: #98a2b3; flex-shrink: 0; }
 .zonelist .sidebar-active-mark { width: 5px; height: 5px; border-radius: 50%; background: #bf4d37; flex-shrink: 0; }
 .zonelist .nav-count { min-width: 20px; padding: 3px 5px; border-radius: 6px; font-size: 10px; background: #b54738; color: #fff; flex-shrink: 0; margin-left: 0; }
 .zonelist .navigation-heading { padding: 22px 24px 14px; }
@@ -88,6 +93,8 @@
   .sidebar-collapsed .zonelist .sidebar-footer > div { display: none; }
   .sidebar-collapsed .zonelist .primary-nav { padding: 0 11px 14px; }
   .sidebar-collapsed .zonelist .primary-nav button { min-height: 52px; justify-content: center; padding: 8px 0; margin-bottom: 8px; }
+  .sidebar-collapsed .zonelist .primary-nav-link { min-height: 52px; justify-content: center; padding: 8px 0; }
+  .sidebar-collapsed .zonelist .primary-nav-out { display: none; }
   .sidebar-collapsed .zonelist .nav-count { position: absolute; top: 2px; right: 1px; min-width: 16px; padding: 2px 4px; font-size: 9px; border: 2px solid #f8f9fb; border-radius: 7px; }
   .sidebar-collapsed .zonelist .sidebar-compact-search { display: grid; margin: 16px auto; background: transparent; border-color: transparent; }
   .sidebar-collapsed .zonelist .sidebar-compact-search:hover { background: #edf0f4; }

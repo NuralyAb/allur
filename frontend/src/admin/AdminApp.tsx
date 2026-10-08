@@ -87,18 +87,21 @@ function Login({ onDone }: { onDone: (me: Me) => void }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
+  const enter = async (user: string, pass: string) => {
     setBusy(true)
     setError(null)
     try {
-      const user = await api.login(login.trim(), password)
-      onDone({ ...user, guest: false, admin: true })
+      const me = await api.login(user.trim(), pass)
+      onDone({ ...me, guest: false, admin: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Сервер недоступен')
     } finally {
       setBusy(false)
     }
+  }
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    void enter(login, password)
   }
   return (
     <div className="admin-splash">
@@ -110,7 +113,8 @@ function Login({ onDone }: { onDone: (me: Me) => void }) {
         <label>Пароль<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
         {error && <div className="form-error" role="alert"><Icon name="alert" size={14} />{error}</div>}
         <button className="button-primary" type="submit" disabled={busy}>{busy ? 'Проверяем…' : 'Войти'}</button>
-        <small>Демо: <code>admin</code> / <code>admin</code>. Операторы и инженеры входят в пульт HMI, не сюда.</small>
+        <button type="button" className="button-secondary" disabled={busy} onClick={() => { setLogin('admin'); setPassword('admin'); void enter('admin', 'admin') }}>Войти администратором (демо)</button>
+        <small>Демо: <code>admin</code> / <code>admin</code>, вход одним нажатием. Диспетчеры и инженеры входят в пульт HMI, не сюда.</small>
       </form>
     </div>
   )
