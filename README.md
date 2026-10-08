@@ -235,23 +235,36 @@ npm run dev
 
 ```
 backend/app/
-  main.py         API: site, plant, kpi, insights, scenario, data/*, live/*, stream
-  plant.py        система координат корпуса, зоны, факты и источники
-  kpi.py          расчёт OEE и сводка по данным из хранилища
-  store.py        хранилище SQLite: линии, простои, качество, план месяца
-  importers.py    импорт DOCX/XLSX в формате кейса, XLSX-шаблон
-  simulator.py    симулятор линии — живой источник данных
-  insights.py     узкое место, прогноз месяца, сценарии, отклонения и риски оборудования
-  scada/          SCADA: PackML, реестр ПЛК, драйверы OPC UA, ядро (тревоги, команды, аудит, историк),
-                  роли, API и симулятор ПЛК с OPC UA-сервером
-  data/controllers.json  реестр контроллеров и подключений; data/scada_users.json — демо-учётки
-  data/site.json  геометрия площадки из OSM
-  data/ndv_sources.json  источники выбросов из проекта НДВ с привязкой к корпусу
+  main.py          точка входа: create_app(), CORS, lifespan, подключение роутеров
+  config.py        пути и переменные окружения (TWIN_DB, файл кейса, каталоги данных)
+  api/             контроллеры — роутеры FastAPI по областям:
+                   health, plant, kpi (kpi, insights, scenario), data (source, import, reset, template),
+                   live (live/*, stream), simulation (сценарные смены), scada (/api/scada/*)
+  schemas/         Pydantic-схемы запросов: kpi (Scenario), simulation (SimulationControl), scada (команды, тревоги)
+  services/        бизнес-логика: plant (паспорт завода), kpi (OEE и сводка), insights (узкое место, прогноз,
+                   сценарии, риски), importers (DOCX/XLSX кейса, шаблон), data_source (источник данных, импорт,
+                   сброс, live), simulator (живой симулятор линии), simulation (дискретно-событийная модель смены)
+  repositories/    store — хранилище SQLite: линии, простои, качество, план месяца
+  scada/           подсистема SCADA: runtime (запуск симулятора ПЛК и OPC UA-сервера, сессии), core (тревоги,
+                   команды, аудит, историк), drivers (OPC UA), packml, registry (реестр ПЛК), auth (роли), plcsim
+  data/            site.json (геометрия из OSM), ndv_sources.json (источники НДВ), controllers.json (реестр ПЛК),
+                   scada_users.json (демо-учётки)
+backend/tests/     unittest: kpi, insights, data, simulation, scada
 frontend/src/
-  scene/          3D: Ground, Hall, Welding, Paint, Assembly, Logistics, Outdoor, tour
-  ui/             панели: KPI, список цехов, карточка цеха, экскурсия
-  hmi/            пульт оператора /hmi.html: панель контроллера, тренды, тревоги, журналы
-docs/SCADA.md     архитектура управления, безопасность, подключение ПЛК завода
+  app/             точка входа двойника (index.html): main.tsx, App.tsx — композиция экранов, styles.css
+  hmi/             пульт оператора (hmi.html): HmiApp, Faceplate, Trend, parts
+  features/        экраны и их логика:
+                   workspace (TopBar, ZoneList, TourBar, общие стили панелей), analytics (аналитика, строка смены),
+                   decisions (центр решений), data-source (источник данных), zones (карточка участка),
+                   vehicles (карточка машины, паспорт), simulation (сессия сценарной смены, панель, часы),
+                   scada (клиент SCADA, контроллеры участка)
+  scene/           3D: Scene.tsx — сборка сцены и ракурсы;
+                   core (свет, подписи, зоны, геометрия координат, экскурсия, материалы, движение),
+                   hall (корпус и цеха: сварка, окраска, сборка, логистика, службы, роботы, рабочие),
+                   site (территория, стоянки, дороги), vehicles (модели машин, парк, GLB и уровни детализации)
+  shared/          общее: api (клиент и вызовы API двойника), types (типы API), hooks (useLive), lib (форматы), ui (Icon, SceneBoundary)
+frontend/scripts/  установка и проверка GLB-моделей; frontend/e2e — Playwright
+docs/SCADA.md      архитектура управления, безопасность, подключение ПЛК завода
 tools/build_site.py  пересборка site.json из OpenStreetMap (Overpass API)
 ```
 

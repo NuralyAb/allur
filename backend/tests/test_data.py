@@ -1,6 +1,7 @@
 import unittest
 
-from app import importers, insights, kpi, simulator, store
+from app.repositories import store
+from app.services import importers, insights, kpi, simulator
 
 
 class ImportTests(unittest.TestCase):

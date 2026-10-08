@@ -1,6 +1,6 @@
 import unittest
 
-from app import importers, kpi
+from app.services import importers, kpi
 
 CASE = {**importers.case_dataset(), "source": "test", "updatedAt": None}
 

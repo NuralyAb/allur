@@ -1,5 +1,5 @@
 import unittest
-from app import importers, insights
+from app.services import importers, insights
 
 CASE = {**importers.case_dataset(), "source": "test", "updatedAt": None}
 

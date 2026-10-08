@@ -11,7 +11,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
     throw error
   }
 } })
-const { prepareVehicleGeometry } = await import('../src/scene/vehicleGeometry.ts')
+const { prepareVehicleGeometry } = await import('../src/scene/vehicles/vehicleGeometry.ts')
 
 const spec = { url: '/models/onix-c1bb20bcc2b636e8.glb', length: 4.474, rotationY: -Math.PI / 2, source: 'test', author: 'test', license: 'CC-BY-4.0' }
 async function loadGeometry(url) {

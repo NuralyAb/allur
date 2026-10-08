@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.simulation import Engine, SimulationConfig, CompareRequest, Session, compare
+from app.services.simulation import Engine, SimulationConfig, CompareRequest, Session, compare
 
 
 class SimulationTests(unittest.TestCase):
@@ -109,14 +109,14 @@ class SimulationTests(unittest.TestCase):
         self.assertGreater(faster_assembly['extraGood'], 0)
 
     def test_pause_reset_speed_and_monotonic_versions(self):
-        with patch('app.simulation.time.monotonic', return_value=0):
+        with patch('app.services.simulation.time.monotonic', return_value=0):
             session = Session(SimulationConfig())
             initial = session.snapshot()
             session.control('resume')
-        with patch('app.simulation.time.monotonic', return_value=10):
+        with patch('app.services.simulation.time.monotonic', return_value=10):
             state = session.control('pause')
             self.assertEqual(state['time'], 20)
-        with patch('app.simulation.time.monotonic', return_value=100):
+        with patch('app.services.simulation.time.monotonic', return_value=100):
             self.assertEqual(session.snapshot()['time'], 20)
             reset = session.control('reset')
             self.assertEqual(reset['time'], 0)

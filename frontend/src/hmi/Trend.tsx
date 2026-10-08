@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { api, clock, fmt, type ParamDef } from './scada'
+import { api, clock, fmt, type ParamDef } from '../features/scada/scada'
 
 const H = 168
 const PAD = { top: 10, right: 52, bottom: 22, left: 44 }

@@ -9,7 +9,9 @@ from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.scada import api, auth, registry
+from app.api import scada as scada_api
+from app.scada import auth, registry
+from app.scada import runtime as api
 from app.scada.core import CommandError, Db, Scada
 from app.scada.drivers import OpcUaDriver
 from app.scada.packml import Command, Mode, State, allowed
@@ -347,7 +349,7 @@ class ApiTests(unittest.TestCase):
             await api.stop()
 
         app = FastAPI(lifespan=lifespan)
-        app.include_router(api.router)
+        app.include_router(scada_api.router)
         with TestClient(app) as client:
             self.assertEqual(len(client.get("/api/scada/config").json()["controllers"]), 12)
             body = {"controller": "conveyor-03", "kind": "packml", "name": "STOP"}

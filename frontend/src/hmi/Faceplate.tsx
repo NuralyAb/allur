@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Icon } from '../ui/Icon'
+import { Icon } from '../shared/ui/Icon'
 import { Trend } from './Trend'
-import { Gauge, Prio, StateChip, Value, paramAlarm } from './parts'
-import { S, can, clock, fmt, nextStep, type Alarm, type Command, type ControllerDef, type ControllerState, type ScadaConfig, type User } from './scada'
+import { Gauge, Prio, StateChip, Value, paramAlarm } from '../features/scada/parts'
+import { S, can, clock, fmt, nextStep, type Alarm, type Command, type ControllerDef, type ControllerState, type ScadaConfig, type User } from '../features/scada/scada'
 
 const STATUS_RU: Record<Command['status'], string> = {
   new: 'Создана', armed: 'Ждёт подтверждения', sent: 'Отправлена в ПЛК', done: 'Выполнена', failed: 'Не выполнена',

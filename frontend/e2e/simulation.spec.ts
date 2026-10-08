@@ -89,7 +89,8 @@ test('live stream advances, pause freezes, reset restores and history remains in
   await page.getByRole('button', { name: 'Вернуться к обзору', exact: true }).click()
   await page.getByRole('navigation', { name: 'Основные разделы' }).getByRole('button', { name: /Аналитика/ }).click()
   await expect(page.getByRole('heading', { name: 'Производственная аналитика', exact: true })).toBeVisible()
-  await expect(page.locator('canvas')).toHaveCount(0)
+  // сцена остаётся смонтированной, но скрытой: возврат в «Завод» не пересоздаёт WebGL
+  await expect(page.locator('canvas')).toBeHidden()
   await expect(page.locator('#main-content')).toContainText('4 800')
   await page.getByRole('button', { name: 'Вернуться к заводу', exact: true }).click()
   await page.getByRole('button', { name: 'Сценарии производства', exact: true }).click()
@@ -223,7 +224,7 @@ test('malformed telemetry is rejected and a valid stream recovers without page e
 })
 
 
-test('data workspaces unmount WebGL and factory navigation restores one scene', async ({ page }) => {
+test('data workspaces hide WebGL and factory navigation restores one scene', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('/?e2e=1')
@@ -233,14 +234,14 @@ test('data workspaces unmount WebGL and factory navigation restores one scene', 
     const button = navigation.getByRole('button', { name })
     await button.click()
     await expect(button).toHaveAttribute('aria-current', 'page')
-    await expect(page.locator('canvas')).toHaveCount(0)
+    await expect(page.locator('canvas')).toBeHidden()
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    await expect(page.locator('#main-content h1')).toBeVisible()
+    await expect(page.locator('#main-content h1:visible')).toBeVisible()
   }
   await navigation.getByRole('button', { name: /Завод в 3D/ }).click()
   await expect(page.locator('canvas')).toHaveCount(1)
   await expect(page.locator('canvas')).toHaveAttribute('data-scene-ready', 'true')
   await navigation.getByRole('button', { name: /Аналитика/ }).click()
-  await expect(page.locator('canvas')).toHaveCount(0)
+  await expect(page.locator('canvas')).toBeHidden()
   expect(errors).toEqual([])
 })

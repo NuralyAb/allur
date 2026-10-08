@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Icon } from '../ui/Icon'
+import { Icon } from '../shared/ui/Icon'
 import { Faceplate, type Actions } from './Faceplate'
-import { Gauge, Prio, StateChip, Value, paramAlarm } from './parts'
-import { api, can, clock, dateTime, fmt, getToken, useScadaState, type Alarm, type AuditRow, type Command, type ControllerDef, type DowntimeEvent, type ScadaConfig, type ScadaState, type User } from './scada'
+import { Gauge, Prio, StateChip, Value, paramAlarm } from '../features/scada/parts'
+import { api, can, clock, dateTime, fmt, getToken, useScadaState, type Alarm, type AuditRow, type Command, type ControllerDef, type DowntimeEvent, type ScadaConfig, type ScadaState, type User } from '../features/scada/scada'
 
 type Toast = { id: number; text: string; tone: 'ok' | 'bad' | 'info' }
 type Tab = 'alarms' | 'commands' | 'audit' | 'events' | 'links'

@@ -3,8 +3,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Group, Quaternion, Vector3 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { createOnixWheelRig } from '../src/scene/onixWheels.ts'
-import { prepareGlbScene } from '../src/scene/prepareGlbScene.ts'
+import { createOnixWheelRig } from '../src/scene/vehicles/onixWheels.ts'
+import { prepareGlbScene } from '../src/scene/vehicles/prepareGlbScene.ts'
 
 const spec = {
   url: '/models/onix-c1bb20bcc2b636e8.glb',

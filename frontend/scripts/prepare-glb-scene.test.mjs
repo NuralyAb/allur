@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { prepareGlbScene } from '../src/scene/prepareGlbScene.ts'
+import { prepareGlbScene } from '../src/scene/vehicles/prepareGlbScene.ts'
 
 const spec = (overrides = {}) => ({
   url: '/models/cars/onix.glb',
