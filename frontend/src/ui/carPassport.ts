@@ -146,8 +146,8 @@ export function scenePassport(selection: CarSelection, live: UnitLive | null, al
     delay += risk.delay
   }
   const area = KPI_AREA[unit.place]
-  for (const alert of alerts) if (alert.kind === 'live' && area && alert.area === area && !handed)
-    issues.push({ level: 'bad', title: alert.title, text: `${alert.text}. Выпуск машины сдвигается, пока участок стоит.` })
+  const stopped = alerts.filter((alert) => alert.kind === 'live' && area && alert.area === area && !handed)
+  for (const alert of stopped) issues.push({ level: 'bad', title: alert.title, text: `${alert.text}. Выпуск машины сдвигается, пока участок стоит.` })
 
   // Длительности участков ±15 % от нормы: у каждой машины свои.
   const durations = SEGMENTS.map((s, i) => s.hours * HOUR * (0.88 + 0.27 * h(`d${i}`)))
@@ -223,7 +223,7 @@ export function scenePassport(selection: CarSelection, live: UnitLive | null, al
     if (unit.place === 'finished') dates.push({ label: 'На площадке', value: dwellDays < 1 ? 'меньше суток' : days(dwellDays), level: dwellDays > 7 ? 'warn' : undefined })
     dates.push({ label: 'Отгрузка дилеру, план', value: dayWord(shipAt, at), note: overdue ? 'просрочена' : undefined, level: overdue ? 'bad' : undefined })
   } else {
-    dates.push({ label: 'Выпуск, прогноз', value: when(releaseAt, at), note: delay ? `+${minutes(delay)}` : 'по графику', level: delay ? 'warn' : 'ok' })
+    dates.push({ label: 'Выпуск, прогноз', value: when(releaseAt, at), note: stopped.length ? 'под угрозой: участок стоит' : delay ? `+${minutes(delay)}` : 'по графику', level: stopped.length ? 'bad' : delay ? 'warn' : 'ok' })
     dates.push({ label: 'Отгрузка дилеру, план', value: dayWord(shipAt, at) })
   }
 
